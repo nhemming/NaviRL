@@ -1,0 +1,97 @@
+Entities:
+  MassFreeVectorEntity:
+    name: basic_agent_learner_1
+    id: 0
+    collision_object:
+      type: circle
+      radius: 1
+  StaticEntity:
+    name: destination
+    id: 1
+    collision_object:
+      type: circle
+      radius: 1
+Environment:
+  domain:
+    min_x: 0 # [m]
+    max_x: 5 # [m]
+    min_y: 0 # [m]
+    max_y: 5 # [m]
+    buffer: 0.05 # [m]
+  time_step: 0.5 # [s]
+ExplorationStrategies:
+  strategy1:
+    
+    name: EpsilonGreedy_0
+    threshold_schedule:
+      point0: 0,0.95
+      point1: 300,0.2
+    type: EpsilonGreedy
+
+
+LearningAgent:
+  name: DQN_0
+  ActionOperation:
+    frequency: 0.5 # [s]
+    is_continous: False
+    name: direct_vector_control
+
+    # discreet solution
+    number_controls: 1 # [-]
+    action_options:
+      option0: -1.570796327,-0.785398163,-0.392699082,-0.174532925,-0.087266463,-0.017453293,0,0.017453293,0.087266463,0.174532925,0.392699082,0.785398163,1.570796327
+
+    # continous solution vv
+    #number_controls: 1 # [-]
+    #bounds:
+    #  bounds0: -0.785398,0.785398 # [rad]
+    # continous solution ^^
+
+  Algorithm:
+    action_rate: 0.1 # [s]
+    device: cuda
+    exploration_strategy: EpsilonGreedy_0
+    type: DQN
+  ControlledEntity: basic_agent_learner_1
+  Input:
+    item0:
+      name: basic_agent_learner_1
+      data: phi # heading
+      min: -3.14159265359 # [rad]
+      max: 3.14159265359 # [rad]
+      norm_min: -1 # [-]
+      norm_max: 1 # [-]
+    item1:
+      name: destination_sensor
+      data: angle
+      min: -3.14159265359 # [rad]
+      max: 3.14159265359 # [rad]
+      norm_min: -1 # [-]
+      norm_max: 1 # [-]
+    item2:
+      name: destination_sensor
+      data: distance
+      min: 0 # [m]
+      max: 12 # [m]
+      norm_min: 0 # [-]
+      norm_max: 1 # [-]
+  Network:
+    batch_norm: False
+    device: cuda
+    dropout: 0.0 # [-]
+    hidden_activations: relu
+    hidden_layers: 64,64
+    initializer: default
+    output_range: -1,1 # [-]
+    seed: 0
+MetaData:
+  set: DebugDQN
+  trial_num: 0
+  num_episodes: 100
+
+Sensors:
+  DestinationSensor:
+    name: destination_sensor
+    id: 0
+    owner: basic_agent_learner_1
+    target: destination
