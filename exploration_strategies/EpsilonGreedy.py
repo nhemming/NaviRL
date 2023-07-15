@@ -51,4 +51,4 @@ class EpsilonGreedy:
                 return np.random.randint(0,self.mutation_definition)
 
         # do  not add mutation. Use original action
-        return actions.numpy()
+        return actions

@@ -85,6 +85,14 @@ class BaseAgent(ABC):
         ce.update_control(self.action_info['applied_action'])
 
     def normalize_state(self,entities, sensors):
+        """
+        Convert the numbers form the dimensional values in the simulation that are needed by the learning agent
+        to a different scale. Typically the scales is [0,1] or [-1,1]
+
+        :param entities:
+        :param sensors:
+        :return:
+        """
 
         state = np.zeros(len(self.observation_information))
         norm_state = np.zeros(len(self.observation_information))

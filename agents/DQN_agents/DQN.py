@@ -22,7 +22,10 @@ class DQN(BaseAgent):
 
         layers_info = [int(i) for i in network_description['hidden_layers'].split(',')]
 
-        layers_info.append(len(action_operation.action_bounds))
+        if action_operation.is_continuous:
+            layers_info.append(len(action_operation.action_bounds))
+        else:
+            layers_info.append(len(action_operation.action_options))
 
         self.q_network = NN(input_dim=len(observation_information), layers_info=layers_info, output_activation=None,
                  hidden_activations=network_description['hidden_activations'], dropout=network_description['dropout'],

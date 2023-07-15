@@ -3,8 +3,9 @@ Entities:
     name: basic_agent_learner_1
     id: 0
     collision_object:
-      type: circle
-      radius: 1
+      type: rectangle
+      height: 4.0  # [m]
+      width: 10.0  # [m]
   StaticEntity:
     name: destination
     id: 1
@@ -33,13 +34,16 @@ LearningAgent:
   name: DQN_0
   ActionOperation:
     frequency: 0.5 # [s]
-    is_continous: False
+    is_continuous: False
     name: direct_vector_control
 
     # discreet solution
     number_controls: 1 # [-]
+
+    # used to describe the options available for the discrete case and the bounds for each action
+    # in the continouos actions.
     action_options:
-      option0: -1.570796327,-0.785398163,-0.392699082,-0.174532925,-0.087266463,-0.017453293,0,0.017453293,0.087266463,0.174532925,0.392699082,0.785398163,1.570796327
+      option0: -0.392699082,-0.087266463,0,0.087266463,0.392699082
 
     # continous solution vv
     #number_controls: 1 # [-]
@@ -62,14 +66,14 @@ LearningAgent:
       norm_min: -1 # [-]
       norm_max: 1 # [-]
     item1:
-      name: destination_sensor
+      name: destination_sensor_0
       data: angle
       min: -3.14159265359 # [rad]
       max: 3.14159265359 # [rad]
       norm_min: -1 # [-]
       norm_max: 1 # [-]
     item2:
-      name: destination_sensor
+      name: destination_sensor_0
       data: distance
       min: 0 # [m]
       max: 12 # [m]
@@ -85,13 +89,45 @@ LearningAgent:
     output_range: -1,1 # [-]
     seed: 0
 MetaData:
+  num_episodes: 10
   set: DebugDQN
+  training_sim_time: 1.0
   trial_num: 0
-  num_episodes: 100
-
+RewardDefinition:
+  component0:
+    adj_factor: 1.0
+    destination_sensor: destination_sensor_0
+    goal_dst: 5.0
+    reward: 10.0
+    type: reach_destination
+  component1:
+    adj_factor: 1.0
+    destination_sensor: destination_sensor_0
+    type: heading_improvement
+  component2:
+    adj_factor: 1.0
+    destination_sensor: destination_sensor_0
+    type: close_distance
+  component3:
+    adj_factor: 1.0
+    aligned_angle: 0.087264
+    aligned_reward: 1.0
+    destination_sensor: destination_sensor_0
+    type: aligned_heading
+  overall_adj_factor: 1.0
 Sensors:
-  DestinationSensor:
-    name: destination_sensor
+  sensor0:
+    type: destination_sensor
+    name: destination_sensor_0
     id: 0
     owner: basic_agent_learner_1
     target: destination
+Termination:
+  component0:
+    destination_sensor: destination_sensor_0
+    goal_dst: 5.0
+    name: reach_destination_0
+    type: reach_destination
+  component1:
+    name: any_collisions_0
+    type: any_collisions

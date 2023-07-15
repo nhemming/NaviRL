@@ -4,6 +4,8 @@ entities to update themselves.
 """
 # native modules
 from abc import ABC, abstractmethod
+import itertools
+
 
 # 3rd party modules
 import numpy as np
@@ -14,17 +16,25 @@ from scipy.special import comb
 
 class ActionOperation(ABC):
 
-    def __init__(self,action_bounds_dict, frequency, is_continuous, name,number_controls, output_range):
+    def __init__(self,action_options_dict, frequency, is_continuous, name, number_controls, output_range):
 
-        self.action_bounds = []
-        for name, value in action_bounds_dict.items():
-            self.action_bounds.append([float(i) for i in value.split(",")])
-        if not is_continuous:
+        if is_continuous:
+            # TODO need to test
+            self.action_bounds = []
+            for name, value in action_options_dict.items():
+                self.action_bounds.append([float(i) for i in value.split(",")])
+        else:
             # reshape to vector
-            self.action_bounds = np.reshape(self.action_bounds,(len(self.action_bounds[0],)))
+            action_option_vals = []
+            for key, value in action_options_dict.items():
+                action_option_vals.append([float(i) for i in value.split(',')])
+
+            self.action_options = list(itertools.product(*action_option_vals))
+
         self.frequency = frequency
-        self.is_continous = is_continuous
+        self.is_continuous = is_continuous
         self.name = name
+
         if is_continuous:
             self.output_range = [float(i) for i in output_range.split(",")]
         else:
@@ -38,8 +48,8 @@ class ActionOperation(ABC):
 
 class DirectVectorControl(ActionOperation):
 
-    def __init__(self, action_bounds_dict, frequency, is_continuous, name, number_controls, output_range):
-        super(DirectVectorControl, self).__init__(action_bounds_dict,frequency,is_continuous,name, number_controls,output_range)
+    def __init__(self, action_options_dict, frequency, is_continuous, name, number_controls, output_range):
+        super(DirectVectorControl, self).__init__(action_options_dict,frequency,is_continuous,name, number_controls,output_range)
 
     def convert_action(self, action_vector):
         """
@@ -48,32 +58,32 @@ class DirectVectorControl(ActionOperation):
         :return:
         """
 
-        if self.is_continous:
+        if self.is_continuous:
             transformed_action = np.zeros_like(action_vector)
             for i, action in enumerate(action_vector):
                 transformed_action[i] = (action - self.output_range[0]) * (self.action_bounds[0][1]-self.action_bounds[0][0]) / (self.output_range[1]-self.output_range[0]) + self.action_bounds[0][0]
         else:
             # convert index to case
-            transformed_action = self.action_bounds[action_vector]
+            transformed_action = self.action_options[action_vector][0]
 
         return transformed_action
 
 
 class BSplineControl(ActionOperation):
 
-    def __init__(self, action_bounds_dict, frequency, is_continous, name, number_controls, output_range):
+    def __init__(self, action_options_dict, frequency, is_continuous, name, number_controls, output_range):
         """
         Action operation that uses a b spline to generate local paths for the agent to follow. A controller converts
         the path into actuations.
 
-        :param action_bounds_dict:
+        :param action_options_dict:
         :param frequency:
-        :param is_continous:
+        :param is_continuous:
         :param name:
         :param number_controls:
         :param output_range:
         """
-        super(BSplineControl, self).__init__(action_bounds_dict, frequency, is_continous, name, number_controls,
+        super(BSplineControl, self).__init__(action_options_dict, frequency, is_continuous, name, number_controls,
                                                   output_range)
 
     def convert_action(self, action_vector):
