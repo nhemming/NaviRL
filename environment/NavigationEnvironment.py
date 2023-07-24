@@ -12,6 +12,7 @@ import yaml
 
 # own modules
 from environment.ActionOperation import BSplineControl, DirectVectorControl
+from environment.BaseAgent import SingleLearningAlgorithmAgent
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
@@ -20,6 +21,7 @@ from environment.Sensor import DestinationSensor
 from environment.StaticEntity import StaticEntity
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
 from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
+from replay_buffer.ReplayBuffer import ReplayBuffer
 
 
 class NavigationEnvironment:
@@ -88,6 +90,9 @@ class NavigationEnvironment:
 
         # create reward function
         self.load_reward_function()
+
+        # create the termination function
+        self.load_termination_function()
 
         # create folders to save information
         output_dir = os.path.join(base_dir,'output')
@@ -180,44 +185,74 @@ class NavigationEnvironment:
                 else:
                     perturb = self.h_params['LearningAgent']['ActionOperation']['action_options']
 
-                eg = EpsilonGreedy(self.h_params['LearningAgent']['Network']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, perturb)
+                eg = EpsilonGreedy(self.h_params['LearningAgent']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, perturb)
                 self.exploration_strategies[eg.name] = eg
 
     def load_learning_agent(self):
 
+        # create agents
         la = self.h_params['LearningAgent']
 
         # parse action operation
         ao = self.load_action_operation()
-
-        alg = la['Algorithm']
-        la_input = la['Input']
-        if alg['type'] == 'DQN':
-            # create a DQN agent
-            row_list = []
-            for value, item in la_input.items():
-                row_list.append(item)
-
-            obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'], data=row_list)
-            agent = DQN(ao,
-                        la['ControlledEntity'],
-                        la['Network']['device'],
-                        self.exploration_strategies[alg['exploration_strategy']],
-                        la['name'],
-                        la['Network'],
-                        obs_df)
-            self.agents[agent.name] = agent
-
+        if la['type'] == 'SingleLearningAlgorithmAgent':
+            agent = SingleLearningAlgorithmAgent(ao,la['ControlledEntity'],la['name'])
         else:
-            raise ValueError('Learning Algorithm not supported')
+            raise ValueError('Agent type not supported')
+
+        # get learning algorithms
+        alg = la['LearningAlgorithm']
+        for lrn_alg_name, lrn_alg_data in alg.items():
+            # optimizer dict
+
+            optimizer_dict = lrn_alg_data['Optimizer']
+
+            la_input = lrn_alg_data['Input']
+            if lrn_alg_data['type'] == 'DQN':
+                # create a DQN agent
+
+                # parse replay buffer
+                replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
+
+                head_dict = dict()
+                for head_name, head_data in la_input.items():
+                    row_list = []
+                    for value, item in head_data.items():
+                        row_list.append(item)
+                    obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'], data=row_list)
+                    head_dict[head_name] = obs_df
+                dqn = DQN(la['device'],
+                            self.exploration_strategies[lrn_alg_data['exploration_strategy']],
+                            lrn_alg_data,
+                            lrn_alg_data['name'],
+                            lrn_alg_data['Network'],
+                            head_dict,
+                            optimizer_dict,
+                            len(ao.action_options),
+                            replay_buffer,
+                            self.h_params['MetaData']['seed'])
+                agent.learning_algorithms[dqn.name] = dqn
+                #@self.agents[agent.name] = agent
+
+            else:
+                raise ValueError('Learning Algorithm not supported')
+        self.agents[agent.name] = agent
 
     def load_action_operation(self):
         op = None
         ao = self.h_params['LearningAgent']['ActionOperation']
+
+        # get algorithm that is linked
+        alg_name = ao['alg_name']
+        la = self.h_params['LearningAgent']['LearningAlgorithm']
+        for name, value in la.items():
+            if value['name'] == alg_name:
+                alg_num = name
+
         if ao['name'] == 'direct_vector_control':
             op = DirectVectorControl(ao['action_options'], ao['frequency'], ao['is_continuous'], ao['name'],
-                                     ao['number_controls'],
-                                     self.h_params['LearningAgent']['Network']['output_range'])
+                                     ao['number_controls'])
+                                     #la[alg_num]['Network']['output_range'])
         elif ao['name'] == 'bspline_control':
 
             op = BSplineControl(ao['action_options'], ao['frequency'], ao['is_continuous'], ao['name'],
@@ -229,39 +264,55 @@ class NavigationEnvironment:
 
         return op
 
+    def load_replay_buffer(self, la_data, device):
+
+
+        rb_data = la_data['ReplayBuffer']
+        if rb_data['type'] == 'vanilla':
+            seed = self.h_params['MetaData']['seed']
+            return ReplayBuffer(rb_data['buffer_size'],la_data['batch_size'],seed, device)
+        else:
+            raise ValueError('Invalid replay buffer type')
+
     def load_reward_function(self):
 
-        self.reward_function = RewardDefinition()
+        agent_names = []
+        for name, value in self.agents.items():
+            agent_names.append(value.name)
+        self.reward_function = RewardDefinition(agent_names)
 
         rd = self.h_params['RewardDefinition']
         self.reward_function.overall_adj_factor = rd['overall_adj_factor']
         for name, value in rd.items():
             if 'component' in name:
                 if value['type'] == 'aligned_heading':
-                    ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'],  value['destination_sensor'])
+                    ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'],  value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                     self.reward_function.reward_components[ahr.name] = ahr
                 elif value['type'] == 'close_distance':
-                    cdr = CloseDistanceReward(value['adj_factor'], value['destination_sensor'])
+                    cdr = CloseDistanceReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                     self.reward_function.reward_components[cdr.name] = cdr
                 elif value['type'] == 'heading_improvement':
-                    ihr = ImproveHeadingReward(value['adj_factor'], value['destination_sensor'])
+                    ihr = ImproveHeadingReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                     self.reward_function.reward_components[ihr.name] = ihr
                 elif value['type'] == 'reach_destination':
-                    rdr = ReachDestinationReward(value['adj_factor'], value['destination_sensor'], value['goal_dst'], value['reward'])
+                    rdr = ReachDestinationReward(value['adj_factor'], value['destination_sensor'], value['goal_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
                     self.reward_function.reward_components[rdr.name] = rdr
                 else:
                     raise ValueError('Unsupported reward component')
 
     def load_termination_function(self):
 
-        term = self.h_params['Termination']
-        self.termination_function = TerminationDefinition()
+        term = self.h_params['TerminationDefinition']
+        agent_names = []
+        for name, value in self.agents.items():
+            agent_names.append(value.name)
+        self.termination_function = TerminationDefinition(agent_names)
         for name, value in term.items():
             if value['type'] == 'any_collisions':
-                self.termination_function.components[value['name']] = AnyCollisionsTermination(value['name'])
+                self.termination_function.components[value['name']] = AnyCollisionsTermination(value['name'],value['target_agent'])
             elif value['type'] == 'reach_destination':
                 self.termination_function.components[value['name']] = \
-                    ReachDestinationTermination(value['destination_sensor'],value['goal_dst'],value['name'])
+                    ReachDestinationTermination(value['destination_sensor'],value['goal_dst'],value['name'],value['target_agent'])
             else:
                 raise ValueError('Invalid termination function')
 
@@ -272,9 +323,18 @@ class NavigationEnvironment:
 
             print("Episode Number={}".format(episode_num))
 
+            # run evaluation set
+
             # run training simulation
             history_path = os.path.join(self.output_dir,'training')
             self.run_simulation(episode_num, history_path, self.max_training_time, True)
+
+            # train agent
+            for name, value in self.agents.items():
+                # train the agent
+                value.train(episode_num)
+
+                # other post episode tasks of the agent
 
     def run_simulation(self, episode_num, history_path, max_time, use_exploration=True):
 
@@ -294,13 +354,17 @@ class NavigationEnvironment:
             tmp_entity.reset()
 
         # reward function reset
-        self.reward_function.reset()
+        for name, reward_comp in self.reward_function.reward_components.items():
+            reward_comp.reset(self.entities, self.sensors, self.reward_function.reward_agents)
+
+        # reset termination
+        self.termination_function.reset()
 
         # add the history of the initial entity states after reseting
         for name, tmp_entity in self.entities.items():
             tmp_entity.add_step_history(sim_time)
 
-        while not done: # TODO add hard time limit but in termination function
+        while not done and sim_time <= max_time:
 
             # update sensors
             for name, tmp_sensor in self.sensors.items():
@@ -333,12 +397,15 @@ class NavigationEnvironment:
                 tmp_entity.add_step_history(sim_time)
 
             # check for termination
-            if sim_time >= max_time:
-                done = True
-            else:
-                self.termination_function.calculate_termination(self.entities, self.sensors)
+            done, done_dict = self.termination_function.calculate_termination(self.entities, self.sensors)
 
             # give MDP tuple back to agent. The agent chooses if it is going to save the data. It already has the state, action, and next state
+            for name, value in self.agents.items():
+                tmp_reward = reward[name]
+                tmp_done = done_dict[name]
+                value.update_memory(tmp_done, self.entities, tmp_reward,self.sensors,sim_time)
+
+                # ask agent if reward functions need to be reset
 
 
         # write entity history

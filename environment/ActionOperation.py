@@ -16,7 +16,7 @@ from scipy.special import comb
 
 class ActionOperation(ABC):
 
-    def __init__(self,action_options_dict, frequency, is_continuous, name, number_controls, output_range):
+    def __init__(self,action_options_dict, frequency, is_continuous, name, number_controls, output_range=None):
 
         if is_continuous:
             # TODO need to test
@@ -48,7 +48,7 @@ class ActionOperation(ABC):
 
 class DirectVectorControl(ActionOperation):
 
-    def __init__(self, action_options_dict, frequency, is_continuous, name, number_controls, output_range):
+    def __init__(self, action_options_dict, frequency, is_continuous, name, number_controls, output_range=None):
         super(DirectVectorControl, self).__init__(action_options_dict,frequency,is_continuous,name, number_controls,output_range)
 
     def convert_action(self, action_vector):
