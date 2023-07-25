@@ -23,7 +23,7 @@ class DQN(BaseLearningAlgorithm):
         super(DQN,self).__init__(device,exploration_strategy, general_params, name, observation_information)
 
         # create the q network and the target network
-        self.q_network = Network(observation_information,network_description, output_dim)
+        self.q_network = Network(device,observation_information,network_description, output_dim)
         self.target_network = copy.deepcopy(self.q_network)
 
         # create replay buffer
@@ -49,7 +49,11 @@ class DQN(BaseLearningAlgorithm):
             self.state_info = {'norm_state':norm_state, 'state':state}
 
             # produce action
-            raw_action, q_values = self.forward(norm_state)
+            q_values = self.forward(norm_state)
+            if self.device == 'cuda':
+                q_values = q_values.cpu()
+            q_values = q_values.numpy()
+            raw_action = np.argmax(q_values)
 
             # exploration perturbations
             mutated_action = None
@@ -63,23 +67,24 @@ class DQN(BaseLearningAlgorithm):
 
     def train(self, ep_num):
 
-        if len(self.replay_buffer.memory) >= self.batch_size:
+        if len(self.replay_buffer) >= self.batch_size:
             # train the agent
             for _ in range(self.num_batches):
                 # TODO look at own code maybe? and compare?
                 states, actions, rewards, next_states, dones = self.replay_buffer.sample(self.batch_size)
 
+                # TODO check if target needs gradients on it. I think not
                 q_target_next = self.forward_target(next_states)
                 q_target = rewards + (self.gamma * q_target_next * (1-dones))
 
-                q_expected = self.forward(states).gather(1,actions.long())
+                q_expected = self.forward_with_grad(states)#.gather(1,actions.long())
 
                 loss = F.mse_loss(q_expected, q_target)
 
-                # take optimzation step
-                self.optimizer.zero_grad() # reset gradients
+                # take optimization step
+                self.optimizer[self.name].zero_grad() # reset gradients
                 loss.backward()
-                self.optimizer.step()
+                self.optimizer[self.name].step()
 
             # check and update target network if needed
             if self.last_target_update - ep_num > self.target_update_rate:
@@ -108,19 +113,30 @@ class DQN(BaseLearningAlgorithm):
             return self.forward_with_grad_target(state)
 
     def forward_with_grad(self,state):
+
+        """
         #output = self.q_network.forward(torch.reshape(torch.from_numpy(state).type(torch.float), (1, len(state))))
         output = self.q_network.forward(state)
 
+        if self.device == 'cuda':
+            output = output.cpu()
         output = output.numpy()
         #output = np.reshape(output, (len(output),))
 
         return np.argmax(output), output
+        """
+        return self.q_network.forward(state)
 
     def forward_with_grad_target(self,state):
-        output = self.target_network.forward(torch.reshape(torch.from_numpy(state).type(torch.float), (1, len(state))))
-
+        """
+        output = self.target_network.forward(state)
+        if self.device == 'cuda':
+            output = output.cpu()
         output = output.numpy()
-        output = np.reshape(output, (len(output[0]),))
 
         return np.argmax(output), output
+        """
+        return self.target_network.forward(state)
+
+
 

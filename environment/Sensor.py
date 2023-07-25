@@ -4,9 +4,12 @@ Sensors are used to aggregate relationship data between entities.
 
 # native modules
 from abc import ABC, abstractmethod
+import copy
+import os
 
 # 3rd party modules
 import numpy as np
+import pandas as pd
 
 # own modules
 from environment.Entity import get_angle_between_vectors
@@ -19,10 +22,28 @@ class Sensor(ABC):
         self.name = name
         self.owner = owner
         self.state_dict = dict()
+        self.history = []
 
     @abstractmethod
     def update(self, time, entities, sensors):
         pass
+
+    def add_step_history(self, sim_time):
+        self.state_dict['sim_time'] = sim_time
+        self.history.append(copy.deepcopy(self.state_dict))
+
+    def reset_history(self):
+        self.history = []
+
+    def reset(self):
+        self.reset_history()
+
+    def write_history(self, episode_number, file_path):
+        # TODO change from csv to sqlite data base
+        # write history to csv
+        df = pd.DataFrame(self.history)
+        file_path = os.path.join(file_path,'sensors')
+        df.to_csv(os.path.abspath(os.path.join(file_path,str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
 
 
 class DestinationSensor(Sensor):

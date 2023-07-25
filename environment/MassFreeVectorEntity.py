@@ -39,5 +39,6 @@ class MassFreeVectorEntity(CollideEntity):
         # reset the heading to a random vector
         self.state_dict['phi'] = np.random.uniform(low=0, high=2.0*np.pi)
 
+
     def apply_action(self, action_vec):
         self.set_heading(action_vec)

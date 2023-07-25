@@ -114,6 +114,11 @@ class NavigationEnvironment:
         training_dir = os.path.join(output_dir, 'training')
         if not os.path.isdir(training_dir):
             os.mkdir(training_dir)
+        train_sub_dir = ['sensors','entities','learning_algorithm']
+        for tsd in train_sub_dir:
+            tmp_dir = os.path.join(training_dir, tsd)
+            if not os.path.isdir(tmp_dir):
+                os.mkdir(tmp_dir)
         progress_dir = os.path.join(output_dir, 'progress')
         if not os.path.isdir(progress_dir):
             os.mkdir(progress_dir)
@@ -351,7 +356,11 @@ class NavigationEnvironment:
 
         # entity reset function
         for name, tmp_entity in self.entities.items():
-            tmp_entity.reset()
+            tmp_entity.reset_base()
+
+        # entity reset sensors
+        for name, tmp_sensor in self.sensors.items():
+            tmp_sensor.reset()
 
         # reward function reset
         for name, reward_comp in self.reward_function.reward_components.items():
@@ -364,7 +373,7 @@ class NavigationEnvironment:
         for name, tmp_entity in self.entities.items():
             tmp_entity.add_step_history(sim_time)
 
-        while not done and sim_time <= max_time:
+        while not done and sim_time < max_time:
 
             # update sensors
             for name, tmp_sensor in self.sensors.items():
@@ -395,6 +404,8 @@ class NavigationEnvironment:
             # update history
             for name, tmp_entity in self.entities.items():
                 tmp_entity.add_step_history(sim_time)
+            for name, tmp_sensor in self.sensors.items():
+                tmp_sensor.add_step_history(sim_time)
 
             # check for termination
             done, done_dict = self.termination_function.calculate_termination(self.entities, self.sensors)
@@ -405,12 +416,26 @@ class NavigationEnvironment:
                 tmp_done = done_dict[name]
                 value.update_memory(tmp_done, self.entities, tmp_reward,self.sensors,sim_time)
 
-                # ask agent if reward functions need to be reset
+                # ask agent if reward functions need to be reset ?
+                for tmp_name, tmp_value in self.reward_function.reward_components.items():
+                    if tmp_value.target_agent == name:
+                        for r_name, r_value in tmp_reward.items():
+                            if tmp_value.target_lrn_alg == r_name:
+                                tmp_value.reset(self.entities, self.sensors, self.reward_function.reward_agents)
 
 
         # write entity history
         for name, tmp_entity in self.entities.items():
             tmp_entity.write_history(episode_num,history_path)
+
+        # write learning alg history
+        for name, tmp_agent in self.agents.items():
+            for tmp_name, tmp_lrn_agent in tmp_agent.learning_algorithms.items():
+                tmp_lrn_agent.write_history(name,episode_num,history_path)
+
+        # write sensor history
+        for name, tmp_sensor in self.sensors.items():
+            tmp_sensor.write_history(episode_num,history_path)
 
     def reset(self):
         # reset the environment. Sensors do not have positions

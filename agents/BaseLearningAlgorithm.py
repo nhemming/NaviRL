@@ -5,9 +5,11 @@ it applies too, and an action operation that converts raw neural network outputs
 
 # native modules
 from abc import ABC, abstractmethod
+import os
 
 # 3rd party modules
 import numpy as np
+import pandas as pd
 import torch.optim as optim
 
 # own modules
@@ -68,6 +70,7 @@ class BaseLearningAlgorithm(ABC):
 
     def reset_base(self):
         self.history_samples = []
+        self.last_reset_time = -np.infty
 
     def normalize_state(self,entities, sensors):
         """
@@ -113,11 +116,24 @@ class BaseLearningAlgorithm(ABC):
     def add_sample_history_helper(self, mdp_tuple, info):
         for name, value in info.items():
             if hasattr(value, '__iter__'):
-                # iterate through array and add to dict
-                for i, item in enumerate(value):
-                    mdp_tuple[name + '_' + str(i)] = item
+
+                if isinstance(value, dict):
+                    for i, item in value.items():
+                        for k, tmp_item in enumerate(item):
+                            mdp_tuple[name +'_'+ str(i)+'_'+str(k) ] = tmp_item
+                else:
+                    # iterate through array and add to dict
+                    for i, item in enumerate(value):
+                        mdp_tuple[name + '_' + str(i)] = item
             else:
                 mdp_tuple[name] = value
+
+    def write_history(self,agent_name,episode_number, file_path):
+        # TODO change from csv to sqlite data base
+        # write history to csv
+        df = pd.DataFrame(self.history_samples)
+        file_path = os.path.join(file_path, 'learning_algorithm')
+        df.to_csv(os.path.abspath(os.path.join(file_path,str(agent_name)+'_'+str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
 
     def load_optimizer(self, name, opt_dict, params):
         #opt = self.h_params['Optimizer']

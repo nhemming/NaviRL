@@ -1,6 +1,6 @@
 Entities:
   MassFreeVectorEntity:
-    name: basic_agent_learner_1
+    name: learning_entity
     id: 0
     collision_object:
       #type: rectangle
@@ -51,11 +51,11 @@ LearningAgent:
     #bounds:
     #  bounds0: -0.785398,0.785398 # [rad]
     # continuous solution ^^
-  ControlledEntity: basic_agent_learner_1
+  ControlledEntity: learning_entity
   device: cuda
   LearningAlgorithm:
     alg0:
-      batch_size: 256
+      batch_size: 4 #256
       exploration_strategy: EpsilonGreedy_0
       gamma: 0.9
       name: DQN_0
@@ -65,7 +65,7 @@ LearningAgent:
       Input:
         head0:
           item0:
-            name: basic_agent_learner_1
+            name: learning_entity
             data: phi # heading
             min: -3.14159265359 # [rad]
             max: 3.14159265359 # [rad]
@@ -153,7 +153,7 @@ Sensors:
     type: destination_sensor
     name: destination_sensor_0
     id: 0
-    owner: basic_agent_learner_1
+    owner: learning_entity
     target: destination
 TerminationDefinition:
   component0:

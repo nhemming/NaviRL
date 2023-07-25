@@ -31,7 +31,7 @@ class TerminationDefinition:
 
     def reset(self):
         for name, value in self.done_agents.items():
-            value = False
+            self.done_agents[name] = False
 
 
 class TerminationComponent(ABC):

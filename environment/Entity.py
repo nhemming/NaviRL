@@ -204,7 +204,11 @@ class Entity:
         # TODO change from csv to sqlite data base
         # write history to csv
         df = pd.DataFrame(self.history)
+        file_path =  os.path.join(file_path, 'entities')
         df.to_csv(os.path.abspath(os.path.join(file_path,str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
+
+    def reset_base(self):
+        self.reset()
 
     def reset(self):
         pass
@@ -227,6 +231,10 @@ class CollideEntity(Entity):
 
         # collision status with other entites
         self.state_dict['is_collided'] = False
+
+    def reset_base(self):
+        self.state_dict['is_collided'] = False
+        self.reset()
 
 
 class CollisionShape(ABC):

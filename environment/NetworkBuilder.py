@@ -2,14 +2,18 @@
 Builds networks with multiple heads if needed.
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 
 
 class Network(nn.Module):
 
-    def __init__(self,input_dict, network_dict, output_dim):
+    def __init__(self,device, input_dict, network_dict, output_dim):
         nn.Module.__init__(self)
+
+        self.device = device
+
         head_sizes = dict()
         for name, value in input_dict.items():
             head_sizes[name] = len(value)
@@ -71,7 +75,7 @@ class Network(nn.Module):
 
             for num_nodes in node_arr:
                 # device
-                linear_layers.extend([nn.Linear(input_dim, num_nodes)])
+                linear_layers.extend([nn.Linear(input_dim, num_nodes).to(self.device)])
                 input_dim = num_nodes
 
             head_layers[name] = linear_layers
@@ -89,9 +93,9 @@ class Network(nn.Module):
         else:
             node_arr = [int(i) for i in nodes.split(',')]
         for num_nodes in node_arr:
-            tail_layers.extend([nn.Linear(input_dim, num_nodes)])
+            tail_layers.extend([nn.Linear(input_dim, num_nodes).to(self.device)])
             input_dim = num_nodes
-        tail_layers.extend([nn.Linear(input_dim, output_dim)])
+        tail_layers.extend([nn.Linear(input_dim, output_dim).to(self.device)])
         return tail_layers
 
     def create_dropout(self):
@@ -119,10 +123,11 @@ class Network(nn.Module):
     def forward(self, input_data):
 
         # pass through heads
-        head_out = torch.FloatTensor()
+        head_out = torch.FloatTensor().to(self.device)
         for head_name, x in input_data.items():
 
-            x = torch.from_numpy(x).float()
+            if isinstance(x,np.ndarray):
+                x = torch.from_numpy(x).float().to(self.device)
 
             layers = self.head_layers[head_name]
             for idx, layer in enumerate(layers):
