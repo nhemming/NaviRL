@@ -2,6 +2,8 @@
 Builds networks with multiple heads if needed.
 """
 
+from collections import OrderedDict
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,11 +16,14 @@ class Network(nn.Module):
 
         self.device = device
 
-        head_sizes = dict()
+        head_sizes = OrderedDict()
         for name, value in input_dict.items():
             head_sizes[name] = len(value)
 
         self.network_dict = network_dict
+
+        # TODO determine if I should save the heads and tails here?
+        self.mod_dict = nn.ModuleDict()
 
         # create the heads of the network
         self.head_layers, concat_size = self.create_heads(head_sizes, network_dict)
@@ -62,7 +67,7 @@ class Network(nn.Module):
         return nn.Dropout(p=self.dropout)
 
     def create_heads(self, head_sizes, network_dict):
-        head_layers = dict()
+        head_layers = OrderedDict()
         concat_size = 0
         for name, value in head_sizes.items():
             linear_layers = nn.ModuleList([])
@@ -99,7 +104,7 @@ class Network(nn.Module):
         return tail_layers
 
     def create_dropout(self):
-        head_dropout = dict()
+        head_dropout = OrderedDict()
         tail_dropout = None
         for name, value in self.network_dict.items():
             if 'head' in name:

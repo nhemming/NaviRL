@@ -5,8 +5,10 @@ reward function pieces.
 
 # native modules
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 
 # 3rd party modules
+import numpy as np
 
 # own modules
 
@@ -14,9 +16,9 @@ from abc import ABC, abstractmethod
 class RewardDefinition:
 
     def __init__(self, agent_names):
-        self.reward_components = dict()
+        self.reward_components = OrderedDict()
         self.overall_adj_factor = None
-        self.reward_agents = {key: dict() for key in agent_names}
+        self.reward_agents = {key: OrderedDict() for key in agent_names}
 
     def calculate_reward(self, entities, sensors):
 
@@ -62,7 +64,7 @@ class AlignedHeadingReward(RewardComponent):
 
         # reward for pointing entity near or directly at goal
         if heading_offset <= self.aligned_angle:
-            reward_agents[self.target_agent][self.target_lrn_alg] += self.aligned_reward
+            reward_agents[self.target_agent][self.target_lrn_alg] += self.aligned_reward*self.adj_factor
 
 
 class CloseDistanceReward(RewardComponent):
@@ -105,7 +107,7 @@ class ImproveHeadingReward(RewardComponent):
         heading_offset = sensors[self.destination_sensor].state_dict['angle']
 
         # reward for improving heading
-        delta_heading = self.old_heading_offset - heading_offset
+        delta_heading = np.abs(self.old_heading_offset) - np.abs(heading_offset)
         if delta_heading >= 0.0:
             reward_agents[self.target_agent][self.target_lrn_alg] += delta_heading * self.adj_factor
 
@@ -126,4 +128,8 @@ class ReachDestinationReward(RewardComponent):
         curr_dst = sensors[self.destination_sensor].state_dict['distance']
 
         if curr_dst <= self.goal_dst:
+
             reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
+
+    def reset(self,entities, sensors, reward_agents):
+        reward_agents[self.target_agent][self.target_lrn_alg] = 0.0

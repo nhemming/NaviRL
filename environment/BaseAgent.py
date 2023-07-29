@@ -5,6 +5,7 @@ depending on how many independent decisions it needs to make.
 
 # native modules
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 
 # 3rd party modules
 
@@ -13,11 +14,12 @@ from abc import ABC, abstractmethod
 
 class BaseAgent(ABC):
 
-    def __init__(self, action_operation,controlled_entity,name):
+    def __init__(self, action_operation,controlled_entity,name, save_rate):
         self.action_operation = action_operation
         self.controlled_entity = controlled_entity
-        self.learning_algorithms = dict()
+        self.learning_algorithms = OrderedDict()
         self.name = name
+        self.save_rate = save_rate
 
     def apply_action(self, entities):
         """
@@ -50,13 +52,16 @@ class BaseAgent(ABC):
         for name, reward in tmp_reward.items():
             self.learning_algorithms[name].update_memory(self.action_operation,tmp_done, entities, reward, sensors, sim_time)
 
-    def train(self, episode_num):
+    def train(self, episode_num, file_path):
         for name, agent in self.learning_algorithms.items():
-            agent.train(episode_num)
+            agent.train(episode_num, file_path)
 
+    def save_model(self,episode_num,history_path):
+        for _, lrn_alg in self.learning_algorithms.items():
+            lrn_alg.save_model(episode_num,history_path)
 
 class SingleLearningAlgorithmAgent(BaseAgent):
 
-    def __init__(self,action_operation,controlled_entity,name):
-        super(SingleLearningAlgorithmAgent, self).__init__(action_operation,controlled_entity,name)
+    def __init__(self,action_operation,controlled_entity,name, save_rate):
+        super(SingleLearningAlgorithmAgent, self).__init__(action_operation,controlled_entity,name,save_rate)
 

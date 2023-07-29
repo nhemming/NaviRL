@@ -4,6 +4,7 @@ Termination function is a composite of conditions that check for what state dete
 
 # native modules
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 
 # 3rd party modules
 import numpy as np
@@ -15,7 +16,7 @@ from environment.Entity import CollideEntity
 class TerminationDefinition:
 
     def __init__(self, agent_names):
-        self.components = dict()
+        self.components = OrderedDict()
         self.done_agents = {key: False for key in agent_names}
 
     def calculate_termination(self, entities, sensors):
@@ -71,6 +72,7 @@ class AnyCollisionsTermination(TerminationComponent):
         # TODO change to only look at target agent
 
         for name, entity in entities.items():
-            if entity.state_dict['is_collided']:
-                done_agents[self.target_agent] = True
+            if isinstance(entity,CollideEntity):
+                if entity.state_dict['is_collided']:
+                    done_agents[self.target_agent] = True
         done_agents[self.target_agent] = done_agents[self.target_agent] or False

@@ -11,26 +11,27 @@ Entities:
   StaticEntity:
     name: destination
     id: 1
-    collision_object:
-      type: circle
-      radius: 1.0 # [m]
+    #collision_object:
+    #  type: circle
+    #  radius: 1.0 # [m]
 Environment:
   domain:
     min_x: 0 # [m]
     max_x: 5 # [m]
     min_y: 0 # [m]
     max_y: 5 # [m]
-    buffer: 0.05 # [m]
+    buffer: 0.5 # [m]
   time_step: 0.5 # [s]
 ExplorationStrategies:
   strategy1:
     name: EpsilonGreedy_0
     threshold_schedule:
       point0: 0,0.95
-      point1: 300,0.2
+      point1: 500,0.2
     type: EpsilonGreedy
 LearningAgent:
   name: general_nav_0
+  save_rate: 50
   type: SingleLearningAlgorithmAgent
   ActionOperation:
     alg_name: basic_control
@@ -44,7 +45,9 @@ LearningAgent:
     # used to describe the options available for the discrete case and the bounds for each action
     # in the continuous actions.
     action_options:
-      option0: -0.392699082,-0.087266463,0,0.087266463,0.392699082
+      #option0: -0.392699082,-0.087266463,-0.017453293,0,0.017453293,0.087266463,0.392699082
+      option0: -0.392699082,0,0.392699082
+
 
     # continuous solution vv
     #number_controls: 1 # [-]
@@ -55,11 +58,11 @@ LearningAgent:
   device: cuda
   LearningAlgorithm:
     alg0:
-      batch_size: 4 #256
+      batch_size: 512
       exploration_strategy: EpsilonGreedy_0
       gamma: 0.9
       name: DQN_0
-      num_batches: 128
+      num_batches: 32
       target_update_rate: 1
       type: DQN
       Input:
@@ -82,7 +85,7 @@ LearningAgent:
             name: destination_sensor_0
             data: distance
             min: 0 # [m]
-            max: 12 # [m]
+            max: 20 # [m]
             norm_min: 0 # [-]
             norm_max: 1 # [-]
       Network:
@@ -112,35 +115,35 @@ LearningAgent:
         type: vanilla
   
 MetaData:
-  num_episodes: 10
+  num_episodes: 1001
   seed: 0
   set: DebugDQN
-  training_sim_time: 4.0
-  trial_num: 0
+  training_sim_time: 20.0
+  trial_num: 1
 
 RewardDefinition:
   component0:
     adj_factor: 1.0
     destination_sensor: destination_sensor_0
     goal_dst: 1.0
-    reward: 10.0
+    reward: 1.0
     target_agent: general_nav_0
     target_lrn_alg: DQN_0
     type: reach_destination
   component1:
-    adj_factor: 1.0
+    adj_factor: 0.01
     destination_sensor: destination_sensor_0
     target_agent: general_nav_0
     target_lrn_alg: DQN_0
     type: heading_improvement
   component2:
-    adj_factor: 1.0
+    adj_factor: 0.1
     destination_sensor: destination_sensor_0
     target_agent: general_nav_0
     target_lrn_alg: DQN_0
     type: close_distance
   component3:
-    adj_factor: 1.0
+    adj_factor: 0.01
     aligned_angle: 0.087264
     aligned_reward: 1.0
     destination_sensor: destination_sensor_0

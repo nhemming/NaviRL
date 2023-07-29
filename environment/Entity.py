@@ -42,59 +42,63 @@ def get_collision_status(entity_1, entity_2):
     :return: boolean for collision status.
     """
 
-    entity_1.collision_shape.update_shape_definition(entity_1.state_dict['phi'],entity_1.state_dict['x_pos'],entity_1.state_dict['y_pos'])
-    entity_2.collision_shape.update_shape_definition(entity_2.state_dict['phi'], entity_2.state_dict['x_pos'],
-                                     entity_2.state_dict['y_pos'])
+    if isinstance(entity_1,CollideEntity) and isinstance(entity_2,CollideEntity):
 
-    if isinstance(entity_1.collision_shape, CollisionCircle) and isinstance(entity_2.collision_shape, CollisionCircle):
-        # both objects are circles. Measure the distances minus the radiuses to check for collision
+        entity_1.collision_shape.update_shape_definition(entity_1.state_dict['phi'],entity_1.state_dict['x_pos'],entity_1.state_dict['y_pos'])
+        entity_2.collision_shape.update_shape_definition(entity_2.state_dict['phi'], entity_2.state_dict['x_pos'],
+                                         entity_2.state_dict['y_pos'])
 
-        dx = entity_1.collision_shape.center_x - entity_2.collision_shape.center_x
-        dy = entity_1.collision_shape.center_y - entity_2.collision_shape.center_y
-        #dz = entity_1.state_dict['z_pos'] - entity_2.state_dict['z_pos']
-        #dst = np.sqrt(dx*dx + dy*dy + dz*dz)
-        dst = np.sqrt(dx * dx + dy * dy)
+        if isinstance(entity_1.collision_shape, CollisionCircle) and isinstance(entity_2.collision_shape, CollisionCircle):
+            # both objects are circles. Measure the distances minus the radiuses to check for collision
 
-        if dst < (entity_1.collision_shape.radius + entity_2.collision_shape.radius):
-            # collision
-            return True
-        return False
+            dx = entity_1.collision_shape.center_x - entity_2.collision_shape.center_x
+            dy = entity_1.collision_shape.center_y - entity_2.collision_shape.center_y
+            #dz = entity_1.state_dict['z_pos'] - entity_2.state_dict['z_pos']
+            #dst = np.sqrt(dx*dx + dy*dy + dz*dz)
+            dst = np.sqrt(dx * dx + dy * dy)
 
-    elif isinstance(entity_1.collision_shape, CollisionRectangle) and isinstance(entity_2.collision_shape, CollisionRectangle):
-        # both are rectangles
-        if rect_to_rect_helper(entity_1, entity_2):
-            return True
-        if rect_to_rect_helper(entity_2, entity_1):
-            return True
-        return False
+            if dst < (entity_1.collision_shape.radius + entity_2.collision_shape.radius):
+                # collision
+                return True
+            return False
 
-    else:
+        elif isinstance(entity_1.collision_shape, CollisionRectangle) and isinstance(entity_2.collision_shape, CollisionRectangle):
+            # both are rectangles
+            if rect_to_rect_helper(entity_1, entity_2):
+                return True
+            if rect_to_rect_helper(entity_2, entity_1):
+                return True
+            return False
 
-        # one is a rectangle and one is a circle
-        if isinstance(entity_1.collision_shape, CollisionRectangle):
-            phi = entity_1.state_dict['phi']
-            rectangle = entity_1
-            rectangle_shape = entity_1.collision_shape
-            circle = entity_2
-            circle_shape = entity_2.collision_shape
         else:
-            phi = entity_2.state_dict['phi']
-            rectangle = entity_2
-            rectangle_shape = entity_2.collision_shape
-            circle = entity_1
-            circle_shape = entity_1.collision_shape
 
-        # rotate circle vector by - angle of rectangle
-        x = circle.state_dict['x_pos']-rectangle.state_dict['x_pos']
-        y = circle.state_dict['y_pos'] - rectangle.state_dict['y_pos']
+            # one is a rectangle and one is a circle
+            if isinstance(entity_1.collision_shape, CollisionRectangle):
+                phi = entity_1.state_dict['phi']
+                rectangle = entity_1
+                rectangle_shape = entity_1.collision_shape
+                circle = entity_2
+                circle_shape = entity_2.collision_shape
+            else:
+                phi = entity_2.state_dict['phi']
+                rectangle = entity_2
+                rectangle_shape = entity_2.collision_shape
+                circle = entity_1
+                circle_shape = entity_1.collision_shape
 
-        x_circle_p = np.abs(x*np.cos(phi) - y * np.sin(phi))
-        y_circle_p = np.abs(x * np.sin(phi) + y * np.cos(phi))
+            # rotate circle vector by - angle of rectangle
+            x = circle.state_dict['x_pos']-rectangle.state_dict['x_pos']
+            y = circle.state_dict['y_pos'] - rectangle.state_dict['y_pos']
 
-        # check for collision
-        if x_circle_p <= rectangle_shape.width/2.0+circle_shape.radius and y_circle_p <= rectangle_shape.height/2.0+circle_shape.radius:
-            # collision happended
-            return True
+            x_circle_p = np.abs(x*np.cos(phi) - y * np.sin(phi))
+            y_circle_p = np.abs(x * np.sin(phi) + y * np.cos(phi))
+
+            # check for collision
+            if x_circle_p <= rectangle_shape.width/2.0+circle_shape.radius and y_circle_p <= rectangle_shape.height/2.0+circle_shape.radius:
+                # collision happended
+                return True
+            return False
+    else:
         return False
 
 
@@ -186,6 +190,15 @@ class Entity:
         self.id = id
         self.name = name
         self.state_dict = {'sim_time' : None}
+
+        # add cg position of the entity
+        self.state_dict['x_pos'] = 0.0
+        self.state_dict['y_pos'] = 0.0
+        self.state_dict['z_pos'] = 0.0
+
+        # add heading
+        self.state_dict['phi'] = 0.0
+
         self.history = []
         self.is_active = False
 
@@ -204,11 +217,12 @@ class Entity:
         # TODO change from csv to sqlite data base
         # write history to csv
         df = pd.DataFrame(self.history)
-        file_path =  os.path.join(file_path, 'entities')
+        file_path = os.path.join(file_path, 'entities')
         df.to_csv(os.path.abspath(os.path.join(file_path,str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
 
     def reset_base(self):
         self.reset()
+        self.reset_history()
 
     def reset(self):
         pass
@@ -221,19 +235,12 @@ class CollideEntity(Entity):
         super(CollideEntity, self).__init__(id, name)
         self.collision_shape = collision_shape
 
-        # add cg position of the entity
-        self.state_dict['x_pos'] = 0.0
-        self.state_dict['y_pos'] = 0.0
-        self.state_dict['z_pos'] = 0.0
-
-        # add heading
-        self.state_dict['phi'] = 0.0
-
         # collision status with other entites
         self.state_dict['is_collided'] = False
 
     def reset_base(self):
         self.state_dict['is_collided'] = False
+        self.history = []
         self.reset()
 
 

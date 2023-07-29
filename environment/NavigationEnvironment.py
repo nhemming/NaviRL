@@ -3,6 +3,7 @@ Environment for navigation tasks. Controls the building, running, and saving the
 """
 
 # native modules
+from collections import OrderedDict
 import os
 
 # 3rd party modules
@@ -18,7 +19,7 @@ from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
 from environment.Sensor import DestinationSensor
-from environment.StaticEntity import StaticEntity
+from environment.StaticEntity import StaticEntity, StaticEntityCollide
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
 from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
 from replay_buffer.ReplayBuffer import ReplayBuffer
@@ -27,24 +28,24 @@ from replay_buffer.ReplayBuffer import ReplayBuffer
 class NavigationEnvironment:
 
     def __init__(self):
-        self.domain = dict()
-        self.h_params = dict()
+        self.domain = OrderedDict()
+        self.h_params = OrderedDict()
         self.delta_t = None # time step of the simulation
         self.max_training_time = 0.0
         self.output_dir = None
 
         # a dictionary of entities in the simulation. These are the objects in the simulation that act. They are typically
         # physical entities, but do not have to be.
-        self.entities = dict()
+        self.entities = OrderedDict()
 
         # a dictionary of sensors for the system. The sensors are used to generate data from interactions of entities.
-        self.sensors = dict()
+        self.sensors = OrderedDict()
 
         # a dictionary of agents that act in the environment. Not all agents are learning agents.
-        self.agents = dict()
+        self.agents = OrderedDict()
 
         # a dictionary of exploration strategies used by the agents to perturb actions during learning.
-        self.exploration_strategies = dict()
+        self.exploration_strategies = OrderedDict()
 
         # object that defines how reward is recieved
         self.reward_function = None
@@ -56,7 +57,7 @@ class NavigationEnvironment:
         # TODO should be loaded from file not hard coded
         self.reset_seperation_dst = 2
 
-    def build_env_from_yaml(self, file_name, base_dir):
+    def build_env_from_yaml(self, file_name, base_dir, create=True):
         """
         Given a yaml file that has configuration details for the environment and hyperparameters for the agents,
         a dictionary is built and returned to the user
@@ -94,38 +95,39 @@ class NavigationEnvironment:
         # create the termination function
         self.load_termination_function()
 
-        # create folders to save information
-        output_dir = os.path.join(base_dir,'output')
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
-        output_dir = os.path.join(output_dir, self.h_params['MetaData']['set'])
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
-        output_dir = os.path.join(output_dir, str(self.h_params['MetaData']['trial_num']))
-        self.output_dir = output_dir
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
-        model_dir = os.path.join(output_dir,'models')
-        if not os.path.isdir(model_dir):
-            os.mkdir(model_dir)
-        eval_dir = os.path.join(output_dir, 'evaluation')
-        if not os.path.isdir(eval_dir):
-            os.mkdir(eval_dir)
-        training_dir = os.path.join(output_dir, 'training')
-        if not os.path.isdir(training_dir):
-            os.mkdir(training_dir)
-        train_sub_dir = ['sensors','entities','learning_algorithm']
-        for tsd in train_sub_dir:
-            tmp_dir = os.path.join(training_dir, tsd)
-            if not os.path.isdir(tmp_dir):
-                os.mkdir(tmp_dir)
-        progress_dir = os.path.join(output_dir, 'progress')
-        if not os.path.isdir(progress_dir):
-            os.mkdir(progress_dir)
+        if create:
+            # create folders to save information
+            output_dir = os.path.join(base_dir,'output')
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
+            output_dir = os.path.join(output_dir, self.h_params['MetaData']['set'])
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
+            output_dir = os.path.join(output_dir, str(self.h_params['MetaData']['trial_num']))
+            self.output_dir = output_dir
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
+            model_dir = os.path.join(output_dir,'models')
+            if not os.path.isdir(model_dir):
+                os.mkdir(model_dir)
+            eval_dir = os.path.join(output_dir, 'evaluation')
+            if not os.path.isdir(eval_dir):
+                os.mkdir(eval_dir)
+            training_dir = os.path.join(output_dir, 'training')
+            if not os.path.isdir(training_dir):
+                os.mkdir(training_dir)
+            train_sub_dir = ['sensors','entities','learning_algorithm','graphs']
+            for tsd in train_sub_dir:
+                tmp_dir = os.path.join(training_dir, tsd)
+                if not os.path.isdir(tmp_dir):
+                    os.mkdir(tmp_dir)
+            progress_dir = os.path.join(output_dir, 'progress')
+            if not os.path.isdir(progress_dir):
+                os.mkdir(progress_dir)
 
-        # save the hyper parameter set
-        with open(os.path.join(output_dir,'hyper_parameters.yaml'), 'w') as file:
-            yaml.safe_dump(self.h_params, file)
+            # save the hyper parameter set
+            with open(os.path.join(output_dir,'hyper_parameters.yaml'), 'w') as file:
+                yaml.safe_dump(self.h_params, file)
 
     def load_entities(self):
         """
@@ -136,8 +138,11 @@ class NavigationEnvironment:
 
             # create the collision object
             collision_shape = None
-            collision_dict = item['collision_object']
-            if collision_dict['type'] == 'circle':
+            collision_dict = item.get('collision_object',None)
+            if collision_dict is None:
+                # do nothing
+                pass
+            elif collision_dict['type'] == 'circle':
                 # create a circle collision object
                 collision_shape = CollisionCircle(0.0,'circle',collision_dict['radius'])
             elif collision_dict['type'] == 'rectangle':
@@ -152,9 +157,12 @@ class NavigationEnvironment:
                 ba = MassFreeVectorEntity(collision_shape, item['id'], item['name'])
                 self.entities[ba.name] = ba
             elif value == 'StaticEntity':
-                # create a basic entity that does not move. Typically, used for static obstacles and destination areas.
-                se = StaticEntity(collision_shape,item['id'],item['name'] )
+                se = StaticEntity(item['id'],item['name'])
                 self.entities[se.name] = se
+            elif value == 'StaticEntityCollide':
+                # create a basic entity that does not move. Typically, used for static obstacles and destination areas.
+                sec = StaticEntityCollide(collision_shape,item['id'],item['name'] )
+                self.entities[sec.name] = sec
             else:
                 raise ValueError('Invalid entity type.')
 
@@ -201,7 +209,7 @@ class NavigationEnvironment:
         # parse action operation
         ao = self.load_action_operation()
         if la['type'] == 'SingleLearningAlgorithmAgent':
-            agent = SingleLearningAlgorithmAgent(ao,la['ControlledEntity'],la['name'])
+            agent = SingleLearningAlgorithmAgent(ao,la['ControlledEntity'],la['name'],la['save_rate'])
         else:
             raise ValueError('Agent type not supported')
 
@@ -219,7 +227,7 @@ class NavigationEnvironment:
                 # parse replay buffer
                 replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
 
-                head_dict = dict()
+                head_dict = OrderedDict()
                 for head_name, head_data in la_input.items():
                     row_list = []
                     for value, item in head_data.items():
@@ -323,6 +331,11 @@ class NavigationEnvironment:
 
     def train_agent(self):
 
+        # save initial agents
+        for name, value in self.agents.items():
+            # train the agent
+            value.save_model(0, self.output_dir)
+
         max_num_episodes = self.h_params['MetaData']['num_episodes']
         for episode_num in range(max_num_episodes):
 
@@ -337,9 +350,7 @@ class NavigationEnvironment:
             # train agent
             for name, value in self.agents.items():
                 # train the agent
-                value.train(episode_num)
-
-                # other post episode tasks of the agent
+                value.train(episode_num,self.output_dir)
 
     def run_simulation(self, episode_num, history_path, max_time, use_exploration=True):
 
@@ -362,10 +373,6 @@ class NavigationEnvironment:
         for name, tmp_sensor in self.sensors.items():
             tmp_sensor.reset()
 
-        # reward function reset
-        for name, reward_comp in self.reward_function.reward_components.items():
-            reward_comp.reset(self.entities, self.sensors, self.reward_function.reward_agents)
-
         # reset termination
         self.termination_function.reset()
 
@@ -373,11 +380,17 @@ class NavigationEnvironment:
         for name, tmp_entity in self.entities.items():
             tmp_entity.add_step_history(sim_time)
 
-        while not done and sim_time < max_time:
+        # update sensors
+        for name, tmp_sensor in self.sensors.items():
+            tmp_sensor.update(sim_time, self.entities, self.sensors)
+        for name, tmp_sensor in self.sensors.items():
+            tmp_sensor.add_step_history(sim_time)
 
-            # update sensors
-            for name, tmp_sensor in self.sensors.items():
-                tmp_sensor.update(sim_time, self.entities, self.sensors)
+        # reward function reset
+        for name, reward_comp in self.reward_function.reward_components.items():
+            reward_comp.reset(self.entities, self.sensors, self.reward_function.reward_agents)
+
+        while not done and sim_time < max_time:
 
             # loop over agents both learning and non-learning
             # select action -> state_dict, action_dict
@@ -391,6 +404,10 @@ class NavigationEnvironment:
             # step simulation for each entity -> new_state_dict
             for name_entity, tmp_entity in self.entities.items():
                 tmp_entity.step(self.delta_t)
+
+            # update sensors
+            for name, tmp_sensor in self.sensors.items():
+                tmp_sensor.update(sim_time, self.entities, self.sensors)
 
             # get reward of the step
             reward = self.reward_function.calculate_reward(self.entities, self.sensors)
@@ -422,6 +439,13 @@ class NavigationEnvironment:
                         for r_name, r_value in tmp_reward.items():
                             if tmp_value.target_lrn_alg == r_name:
                                 tmp_value.reset(self.entities, self.sensors, self.reward_function.reward_agents)
+
+            '''
+            # check for leaving the domain. This is seperate of termination conditions
+            for name, entity in self.entities.items():
+                if self.domain['min_x']-self.domain['buffer'] <= entity.state_dict['x_pos'] <= self.domain['max_x']+self.domain['buffer'] or self.domain['min_y']-self.domain['buffer'] <= entity.state_dict['y_pos'] <= self.domain['max_y']+self.domain['buffer']:
+                    done = True
+            '''
 
 
         # write entity history

@@ -5,10 +5,11 @@ A basic agent is an agent that is a massless point that can move anywhere in 2 d
 # native modules
 
 # 3rd party modules
+import matplotlib.pyplot as plt
 import numpy as np
 
 # own modules
-from environment.Entity import CollideEntity
+from environment.Entity import CollideEntity, CollisionCircle, CollisionRectangle
 
 
 class MassFreeVectorEntity(CollideEntity):
@@ -41,4 +42,26 @@ class MassFreeVectorEntity(CollideEntity):
 
 
     def apply_action(self, action_vec):
-        self.set_heading(action_vec)
+        self.set_heading(action_vec+self.state_dict['phi'])
+
+    def draw_trajectory(self, ax, data, sim_time):
+
+        # draw trajectory
+        ax.plot(data['x_pos'],data['y_pos'])
+
+        # draw shape
+        if isinstance(self.collision_shape,CollisionCircle):
+            row = data.loc[data['sim_time'] == sim_time]
+            circle = plt.Circle((row['x_pos'],row['y_pos']),radius=self.collision_shape.radius,alpha=0.3)
+            ax.add_patch(circle)
+
+    def draw_telemetry_trajectory(self, ax, data, sim_time):
+        ax.plot(data['sim_time'],data['x_pos'],label='X')
+        ax.plot(data['sim_time'], data['y_pos'], label='Y')
+        ax.legend()
+
+    def draw_telemetry_heading(self, ax, data, sim_time):
+        ax.plot(data['sim_time'],data['phi'],label='X')
+
+    def draw_telemetry_velocity(self, ax, data, sim_time):
+        ax.plot(data['sim_time'],data['velocity'],label='X')
