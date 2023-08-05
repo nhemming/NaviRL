@@ -120,8 +120,8 @@ def main():
     # set experiments to evaluate
     base_folder = 'demo_to_test_DQN'
     set_name = 'DebugDQN'
-    trial_num = 1
-    ep_num_vec = range(300,500)
+    trial_num = 3
+    ep_num_vec = range(950,1150)
     create_video = False
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')

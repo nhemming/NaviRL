@@ -70,6 +70,9 @@ class DQN(BaseLearningAlgorithm):
             # partial log own data (input, raw output, perturbed output)
             self.action_info = {'raw_action':raw_action, 'mutated_action': mutated_action, 'q_values': q_values}
 
+            # save information that it is persistent for the action operation until the next time an action is selected.
+            self.action_info['persistent_info'] = action_operation.setPersistentInfo(entities, sensors)
+
     def train(self, ep_num,file_path):
 
         if len(self.replay_buffer) >= self.batch_size:
@@ -83,7 +86,6 @@ class DQN(BaseLearningAlgorithm):
 
                 q_expected = self.forward_with_grad(states).gather(1,actions.long())
 
-                # TODO save loss
                 loss = F.mse_loss(q_expected, q_target)
                 loss_save[i] = loss
 
@@ -94,7 +96,7 @@ class DQN(BaseLearningAlgorithm):
 
 
             # save the loss value
-            #self.save_loss
+            self.append_to_loss_file( ep_num, loss_save)
 
             # check and update target network if needed
             if ep_num - self.last_target_update > self.target_update_rate:
@@ -105,7 +107,7 @@ class DQN(BaseLearningAlgorithm):
     def update_memory(self, action_operation, done, entities, reward, sensors, sim_time):
 
         # if is_new_action == True save data, else don't save the data
-        if sim_time - self.last_reset_time >= action_operation.frequency:
+        if sim_time - self.last_reset_time >= action_operation.frequency or done:
             self.state_info['norm_next_state'], self.state_info['next_state'] = self.normalize_state( entities, sensors)
 
             self.replay_buffer.add_experience(self.state_info['norm_state'], self.action_info['mutated_action'], reward, self.state_info['norm_next_state'], done)

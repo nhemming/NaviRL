@@ -18,17 +18,25 @@ class MassFreeVectorEntity(CollideEntity):
         super(MassFreeVectorEntity, self).__init__( collision_shape, id, name)
 
         self.state_dict['phi'] = 0.0  # heading in global coordinates [rad]
-        self.state_dict['velocity'] = 1.0  # velocity the agent moves at in the simulation [m/s]
+        self.state_dict['v_mag'] = 1.0  # velocity the agent moves at in the simulation [m/s]
 
     def step(self, delta_t):
 
-        dx = self.state_dict['velocity'] * np.cos(self.state_dict['phi']) * delta_t
-        dy = self.state_dict['velocity'] * np.sin(self.state_dict['phi']) * delta_t
+        dx = self.state_dict['v_mag'] * np.cos(self.state_dict['phi']) * delta_t
+        dy = self.state_dict['v_mag'] * np.sin(self.state_dict['phi']) * delta_t
 
         self.state_dict['x_pos'] += dx
         self.state_dict['y_pos'] += dy
 
-    def set_heading(self, phi):
+    def adj_heading(self, phi_adj):
+
+        if phi_adj > np.deg2rad(45.0):
+            phi_adj = np.deg2rad(45.0)
+        elif phi_adj < -np.deg2rad(45.0):
+            phi_adj = -np.deg2rad(45.0)
+
+        phi = self.state_dict['phi'] + phi_adj
+
         # correct angle to be between 0 and pi
         if phi > 2.0*np.pi:
             phi -= 2.0*np.pi
@@ -42,7 +50,7 @@ class MassFreeVectorEntity(CollideEntity):
 
 
     def apply_action(self, action_vec):
-        self.set_heading(action_vec+self.state_dict['phi'])
+        self.adj_heading(action_vec)
 
     def draw_trajectory(self, ax, data, sim_time):
 
@@ -64,4 +72,4 @@ class MassFreeVectorEntity(CollideEntity):
         ax.plot(data['sim_time'],data['phi'],label='X')
 
     def draw_telemetry_velocity(self, ax, data, sim_time):
-        ax.plot(data['sim_time'],data['velocity'],label='X')
+        ax.plot(data['sim_time'],data['v_mag'],label='X')

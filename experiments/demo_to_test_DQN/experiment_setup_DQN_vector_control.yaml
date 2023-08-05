@@ -93,13 +93,13 @@ LearningAgent:
         head0:
           #batch_norm: False
           dropout: 0.0 # [-]
-          hidden_activations: relu
-          hidden_layers: 64 # 64,64
+          hidden_activation: relu
+          hidden_layers: 32 # 64,64
         tail:
           #batch_norm: False
           dropout: 0.0
           hidden_activation: relu
-          hidden_layers: 64
+          hidden_layers: 32
           last_activation: none
           # only needed for continuous case
           #output_range: -1,1 # [-]
@@ -115,11 +115,11 @@ LearningAgent:
         type: vanilla
   
 MetaData:
-  num_episodes: 1001
+  num_episodes: 1000
   seed: 0
   set: DebugDQN
   training_sim_time: 20.0
-  trial_num: 1
+  trial_num: 3
 
 RewardDefinition:
   component0:

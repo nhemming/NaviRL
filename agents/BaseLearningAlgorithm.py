@@ -126,8 +126,12 @@ class BaseLearningAlgorithm(ABC):
 
                 if isinstance(value, dict):
                     for i, item in value.items():
-                        for k, tmp_item in enumerate(item):
-                            mdp_tuple[name +'_'+ str(i)+'_'+str(k) ] = tmp_item
+
+                        if hasattr(item, '__iter__'):
+                            for k, tmp_item in enumerate(item):
+                                mdp_tuple[name +'_'+ str(i)+'_'+str(k) ] = tmp_item
+                        else:
+                            mdp_tuple[name+'_'+str(i)] = item
                 else:
                     # iterate through array and add to dict
                     for i, item in enumerate(value):
@@ -149,10 +153,24 @@ class BaseLearningAlgorithm(ABC):
         else:
             raise ValueError('Optimizer not supported')
 
-    def execute_action_operation(self, action_operation, controlled_entity, entities):
+    def execute_action_operation(self, action_operation, delta_t, controlled_entity, entities, sensors):
 
         # scale the output to the robots action?
-        self.action_info['applied_action'] = action_operation.convert_action(self.action_info['mutated_action'])
+        self.action_info['applied_action'] = action_operation.convert_action(self.action_info['mutated_action'],delta_t, entities, sensors)
 
         # apply the action
         entities[controlled_entity].apply_action(self.action_info['applied_action'])
+
+    def create_loss_file(self, base_dir, agent):
+        file_path = os.path.join(base_dir,'learning_algorithm',agent+'_'+self.name+'_loss.csv')
+        self.file_path_loss = file_path
+        with open(file_path, 'w') as f:
+            f.write("Episode_number,loss\n")
+
+    def append_to_loss_file(self, ep_num, loss):
+        loss_string = ''
+        for i, loss_val in enumerate(loss):
+            loss_string += str(ep_num) +','+str(loss_val)+'\n'
+
+        with open(self.file_path_loss, 'a') as f:
+            f.write(loss_string)

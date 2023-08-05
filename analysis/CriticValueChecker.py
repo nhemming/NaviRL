@@ -40,7 +40,7 @@ def main():
     # set experiments to evaluate
     base_folder = 'demo_to_test_DQN'
     set_name = 'DebugDQN'
-    trial_num = 1
+    trial_num = 2
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)
@@ -50,11 +50,6 @@ def main():
 
     env = load_environment(base_folder, set_name, trial_num)
 
-    '''
-    x_loc_entity = [0.0,3.0,0.0,3.0]
-    y_loc_entity = [0.0,0.0,4.0,4.0]
-    phi_headings = [0.0,0.0,0.0,0.0]
-    '''
     x_loc_entity = [0.0,0.0 ]
     y_loc_entity = [0.0,3.0]
     phi_headings = [0.0,0.0]

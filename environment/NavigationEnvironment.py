@@ -3,7 +3,7 @@ Environment for navigation tasks. Controls the building, running, and saving the
 """
 
 # native modules
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 import os
 
 # 3rd party modules
@@ -16,6 +16,7 @@ from environment.ActionOperation import BSplineControl, DirectVectorControl
 from environment.BaseAgent import SingleLearningAlgorithmAgent
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
+from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
 from environment.Sensor import DestinationSensor
@@ -131,7 +132,8 @@ class NavigationEnvironment:
 
     def load_entities(self):
         """
-        From the data in the input file, entities are created and saved.
+        From the data in the input file, entities are created and saved. The entities are the physical or pseudo
+        physical objects in the simulation.
         :return:
         """
         for value, item in self.h_params['Entities'].items():
@@ -167,6 +169,11 @@ class NavigationEnvironment:
                 raise ValueError('Invalid entity type.')
 
     def load_sensors(self):
+        """
+        parses the input to create the sensors that can exist in the simulation. The sensors need to be assigned
+        an owner.
+        :return:
+        """
 
         for value, item in self.h_params['Sensors'].items():
             if item['type'] == 'destination_sensor':
@@ -176,6 +183,11 @@ class NavigationEnvironment:
                 raise ValueError('Invalid Sensor Type')
 
     def load_exploration_strategies(self):
+        """
+        Loads and creates the exploration strategy object from the input file. This drives how random action are taken
+        during the simulation.
+        :return:
+        """
 
         es = self.h_params['ExplorationStrategies']
         for value, item in es.items():
@@ -202,6 +214,11 @@ class NavigationEnvironment:
                 self.exploration_strategies[eg.name] = eg
 
     def load_learning_agent(self):
+        """
+        Reads the input file and creates the learning agents that act in the environment. Learning agents can have
+        more than one RL learning algorithm assciated with it.
+        :return:
+        """
 
         # create agents
         la = self.h_params['LearningAgent']
@@ -252,30 +269,40 @@ class NavigationEnvironment:
         self.agents[agent.name] = agent
 
     def load_action_operation(self):
+        """
+        From the input file, creates an action operation for the agent. The action operation converts raw neural network
+        outputs to controller changes in linked entity.
+        :return:
+        """
         op = None
         ao = self.h_params['LearningAgent']['ActionOperation']
 
-        # get algorithm that is linked
-        alg_name = ao['alg_name']
-        la = self.h_params['LearningAgent']['LearningAlgorithm']
-        for name, value in la.items():
-            if value['name'] == alg_name:
-                alg_num = name
+        # load the controller
+        controller = self.load_controller(ao['controller'])
 
         if ao['name'] == 'direct_vector_control':
-            op = DirectVectorControl(ao['action_options'], ao['frequency'], ao['is_continuous'], ao['name'],
+            op = DirectVectorControl(ao['action_options'], None, ao['frequency'], ao['is_continuous'], ao['name'],
                                      ao['number_controls'])
-                                     #la[alg_num]['Network']['output_range'])
         elif ao['name'] == 'bspline_control':
 
-            op = BSplineControl(ao['action_options'], ao['frequency'], ao['is_continuous'], ao['name'],
-                                     ao['number_controls'],
-                                     self.h_params['LearningAgent']['Network']['output_range'])
+            op = BSplineControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
+                                     ao['number_controls'], None, ao['segment_length'], ao['target_entity'])
 
         else:
             raise ValueError('Invalid action operation designation')
 
         return op
+
+    def load_controller(self, controller_definition):
+        if controller_definition['type'] == 'pd':
+            coeffs = namedtuple("coeffs", "p d")
+            coeffs.p = float(controller_definition['p'])
+            coeffs.d = float(controller_definition['d'])
+            controller = PDController(coeffs)
+        else:
+            raise ValueError('An un supported controller type has been loaded in')
+
+        return controller
 
     def load_replay_buffer(self, la_data, device):
 
@@ -335,6 +362,10 @@ class NavigationEnvironment:
         for name, value in self.agents.items():
             # train the agent
             value.save_model(0, self.output_dir)
+
+        for name, tmp_agent in self.agents.items():
+            for _, tmp_lrn_alg in tmp_agent.learning_algorithms.items():
+                tmp_lrn_alg.create_loss_file(os.path.join(self.output_dir,'training'), name)
 
         max_num_episodes = self.h_params['MetaData']['num_episodes']
         for episode_num in range(max_num_episodes):
@@ -399,7 +430,7 @@ class NavigationEnvironment:
 
             # convert action and apply the change
             for name, tmp_agent in self.agents.items():
-                tmp_agent.execute_action_operation(self.entities)
+                tmp_agent.execute_action_operation(self.delta_t, self.entities, self.sensors)
 
             # step simulation for each entity -> new_state_dict
             for name_entity, tmp_entity in self.entities.items():
@@ -446,7 +477,6 @@ class NavigationEnvironment:
                 if self.domain['min_x']-self.domain['buffer'] <= entity.state_dict['x_pos'] <= self.domain['max_x']+self.domain['buffer'] or self.domain['min_y']-self.domain['buffer'] <= entity.state_dict['y_pos'] <= self.domain['max_y']+self.domain['buffer']:
                     done = True
             '''
-
 
         # write entity history
         for name, tmp_entity in self.entities.items():

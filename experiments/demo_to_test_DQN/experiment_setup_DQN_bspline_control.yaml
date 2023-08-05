@@ -1,92 +1,182 @@
 Entities:
   MassFreeVectorEntity:
-    name: basic_agent_learner_1
+    name: learning_entity
     id: 0
     collision_object:
+      #type: rectangle
+      #height: 4.0  # [m]
+      #width: 10.0  # [m]
       type: circle
-      radius: 1
+      radius: 0.5 # [m]
   StaticEntity:
     name: destination
     id: 1
-    collision_object:
-      type: circle
-      radius: 1
+    #collision_object:
+    #  type: circle
+    #  radius: 1.0 # [m]
 Environment:
   domain:
     min_x: 0 # [m]
-    max_x: 5 # [m]
+    max_x: 10 # [m]
     min_y: 0 # [m]
-    max_y: 5 # [m]
-    buffer: 0.05 # [m]
-  time_step: 0.5 # [s]
+    max_y: 10 # [m]
+    buffer: 0.5 # [m]
+  time_step: 0.1 # [s]
 ExplorationStrategies:
   strategy1:
     name: EpsilonGreedy_0
     threshold_schedule:
       point0: 0,0.95
-      point1: 300,0.2
+      point1: 1200,0.2
     type: EpsilonGreedy
-
-
 LearningAgent:
-  name: DQN_0
+  name: general_nav_0
+  save_rate: 50
+  type: SingleLearningAlgorithmAgent
   ActionOperation:
-    frequency: 0.5 # [s]
+    alg_name: basic_control
+    frequency: 2.0 # [s]
     is_continuous: False
     name: bspline_control
 
     # discreet solution
     number_controls: 1 # [-]
+    segment_length: 1
+    target_entity: learning_entity
+    controller:
+      type: pd
+      p: 1.0
+      d: 0.01
+
+    # used to describe the options available for the discrete case and the bounds for each action
+    # in the continuous actions.
     action_options:
-      option0: -0.392699082,-0.087266463,0,0.087266463,0.392699082
-      option1: -0.392699082,-0.087266463,0,0.087266463,0.392699082
-      option2: -0.392699082,-0.087266463,0,0.087266463,0.392699082
+      #option0: -0.392699082,-0.087266463,-0.017453293,0,0.017453293,0.087266463,0.392699082
+      #option0: -0.392699082,-0.174532925,0,0.174532925,0.392699082
+      #option1: -0.392699082,-0.174532925,0,0.174532925,0.392699082
+      #option2: -0.392699082,-0.174532925,0,0.174532925,0.392699082
+      option0: -0.392699082,0,0.392699082
+      option1: -0.392699082,0,0.392699082
+      option2: -0.392699082,0,0.392699082
 
-  Algorithm:
-    action_rate: 0.1 # [s]
-    device: cuda
-    exploration_strategy: EpsilonGreedy_0
-    type: DQN
-  ControlledEntity: basic_agent_learner_1
-  Input:
-    item0:
-      name: basic_agent_learner_1
-      data: phi # heading
-      min: -3.14159265359 # [rad]
-      max: 3.14159265359 # [rad]
-      norm_min: -1 # [-]
-      norm_max: 1 # [-]
-    item1:
-      name: destination_sensor
-      data: angle
-      min: -3.14159265359 # [rad]
-      max: 3.14159265359 # [rad]
-      norm_min: -1 # [-]
-      norm_max: 1 # [-]
-    item2:
-      name: destination_sensor
-      data: distance
-      min: 0 # [m]
-      max: 12 # [m]
-      norm_min: 0 # [-]
-      norm_max: 1 # [-]
-  Network:
-    batch_norm: False
-    device: cuda
-    dropout: 0.0 # [-]
-    hidden_activations: relu
-    hidden_layers: 64,64
-    initializer: default
-    output_range: -1,1 # [-]
-    seed: 0
+
+    # continuous solution vv
+    #number_controls: 1 # [-]
+    #bounds:
+    #  bounds0: -0.785398,0.785398 # [rad]
+    # continuous solution ^^
+  ControlledEntity: learning_entity
+  device: cuda
+  LearningAlgorithm:
+    alg0:
+      batch_size: 512
+      exploration_strategy: EpsilonGreedy_0
+      gamma: 0.9
+      name: DQN_0
+      num_batches: 32
+      target_update_rate: 1
+      type: DQN
+      Input:
+        head0:
+          item0:
+            name: learning_entity
+            data: phi # heading
+            min: -3.14159265359 # [rad]
+            max: 3.14159265359 # [rad]
+            norm_min: -1 # [-]
+            norm_max: 1 # [-]
+          item1:
+            name: destination_sensor_0
+            data: angle
+            min: -3.14159265359 # [rad]
+            max: 3.14159265359 # [rad]
+            norm_min: -1 # [-]
+            norm_max: 1 # [-]
+          item2:
+            name: destination_sensor_0
+            data: distance
+            min: 0 # [m]
+            max: 20 # [m]
+            norm_min: 0 # [-]
+            norm_max: 1 # [-]
+      Network:
+        initializer: xavier
+        head0:
+          #batch_norm: False
+          dropout: 0.0 # [-]
+          hidden_activation: relu
+          hidden_layers: 64 # 64,64
+        tail:
+          #batch_norm: False
+          dropout: 0.0
+          hidden_activation: relu
+          hidden_layers: 64
+          last_activation: none
+          # only needed for continuous case
+          #output_range: -1,1 # [-]
+      Optimizer:
+        beta1: 0.9
+        beta2: 0.999
+        learning_agent: DQN_0
+        lr: 0.001
+        name: adam_0
+        type: adam
+      ReplayBuffer:
+        buffer_size: 131584
+        type: vanilla
+  
 MetaData:
+  num_episodes: 2000
+  seed: 0
   set: DebugDQN
-  trial_num: 0
-  num_episodes: 100
+  training_sim_time: 40.0
+  trial_num: 3
 
+RewardDefinition:
+  component0:
+    adj_factor: 1.0
+    destination_sensor: destination_sensor_0
+    goal_dst: 1.0
+    reward: 1.0
+    target_agent: general_nav_0
+    target_lrn_alg: DQN_0
+    type: reach_destination
+  component1:
+    adj_factor: 0.01
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DQN_0
+    type: heading_improvement
+  component2:
+    adj_factor: 0.1
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DQN_0
+    type: close_distance
+  component3:
+    adj_factor: 0.01
+    aligned_angle: 0.087264
+    aligned_reward: 1.0
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DQN_0
+    type: aligned_heading
+  overall_adj_factor: 1.0
 Sensors:
-  DestinationSensor:
-    name: destination_sensor
+  sensor0:
+    type: destination_sensor
+    name: destination_sensor_0
     id: 0
-    owner: basic_agent_learner_1
+    owner: learning_entity
     target: destination
+TerminationDefinition:
+  component0:
+    destination_sensor: destination_sensor_0
+    goal_dst: 1.0
+    name: reach_destination_0
+    target_agent: general_nav_0
+    type: reach_destination
+  component1:
+    name: any_collisions_0
+    target_agent: general_nav_0
+    type: any_collisions

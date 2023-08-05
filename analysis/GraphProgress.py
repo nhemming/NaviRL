@@ -39,7 +39,7 @@ def main():
     # set experiments to evaluate
     base_folder = 'demo_to_test_DQN'
     set_name = 'DebugDQN'
-    trial_num = 1
+    trial_num = 3
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)
@@ -52,6 +52,7 @@ def main():
     # get the names of the agents
     file_dir = os.path.join(base_dir, 'training', 'learning_algorithm')
     dir_list = os.listdir(file_dir)
+    dir_list = [i for i in dir_list if 'loss' not in i]
     for i, file in enumerate(dir_list):
         dir_list[i] = file.split('_epnum')[0]
 
@@ -60,6 +61,7 @@ def main():
     df['ep_num'] = 0.0
     for i, an in enumerate(agent_names):
         for j,_ in enumerate(dir_list):
+            print("Processecing episode "+str(j))
             tmp_file = os.path.join(file_dir,an+'_epnum-'+str(j)+'.csv')
             tmp_df = pd.read_csv(tmp_file)
             cum_reward = tmp_df['reward'].sum()
@@ -110,6 +112,23 @@ def main():
     ax.plot(df['ep_num'], success_smooth, label='success mean')
     plt.tight_layout()
     plt.savefig(os.path.join(file_dir, 'SuccessRate.png'))
+
+    # create the loss graph
+    fig = plt.figure(2, figsize=(14, 8))
+    ax = fig.add_subplot(111)
+
+    file_dir = os.path.join(base_dir, 'training', 'learning_algorithm')
+    for name, agent in env.agents.items():
+        for tmp_name, lrn_alg in agent.learning_algorithms.items():
+            loss_file = os.path.join(file_dir,name+'_'+tmp_name+'_loss.csv')
+            df = pd.read_csv(loss_file)
+            ax.semilogy([i for i in range(len(df))],df['loss'],label=name+'_'+tmp_name,alpha=0.2)
+            loss_smooth = uniform_filter1d(df['loss'], 100)
+            ax.semilogy([i for i in range(len(df))], loss_smooth, label=name + '_' + tmp_name)
+
+    ax.legend()
+    file_dir = os.path.join(base_dir, 'progress')
+    plt.savefig(os.path.join(file_dir, 'Loss.png'))
 
     plt.close()
 

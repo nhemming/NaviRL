@@ -16,7 +16,7 @@ from environment.NavigationEnvironment import NavigationEnvironment
 def main():
 
     env = NavigationEnvironment()
-    test_scenario_number = 0
+    test_scenario_number = 1
     input_file_name = ''
     if test_scenario_number == 0:
         input_file_name = 'experiment_setup_DQN_vector_control.yaml'
@@ -24,8 +24,6 @@ def main():
         input_file_name = 'experiment_setup_DQN_bspline_control.yaml'
     elif test_scenario_number == 2:
         input_file_name = 'experiment_setup_DQN_dubins_control.yaml'
-    elif test_scenario_number == 3:
-        input_file_name = 'experiment_setup_DQN_point_control.yaml'
 
     # get directory of this script
     cur_dir = os.getcwd()

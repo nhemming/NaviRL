@@ -35,10 +35,10 @@ class BaseAgent(ABC):
         # each entity is responsible for parsing the vector to apply changes.
         ce.update_control(self.action_info['applied_action'])
 
-    def execute_action_operation(self, entities):
+    def execute_action_operation(self, delta_t, entities, sensors):
 
         for name, value in self.learning_algorithms.items():
-            value.execute_action_operation(self.action_operation, self.controlled_entity, entities)
+            value.execute_action_operation(self.action_operation, delta_t, self.controlled_entity, entities, sensors)
 
     def reset(self):
         for name, value in self.learning_algorithms.items():
