@@ -18,7 +18,11 @@ class EpsilonGreedy:
         # if continuous, this is the number of total actions. If continuous, this describes how perturbations are sampled
         num_options = 1
         for name, value in mutation_definition.items():
-            num_options *= len([float(i) for i in value.split(',')])
+            if isinstance(value,str):
+                # there is more than one option so split them. If this if statement is not taken, that means there is
+                # only one option.
+                num_options *= len([float(i) for i in value.split(',')])
+
         self.mutation_definition = num_options
 
     def add_perturbation(self,actions, ep_num):

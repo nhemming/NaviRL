@@ -16,7 +16,7 @@ from environment.NavigationEnvironment import NavigationEnvironment
 def main():
 
     env = NavigationEnvironment()
-    test_scenario_number = 1
+    test_scenario_number = 0
     input_file_name = ''
     if test_scenario_number == 0:
         input_file_name = 'experiment_setup_DQN_vector_control.yaml'

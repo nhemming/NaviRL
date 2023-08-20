@@ -128,9 +128,9 @@ LearningAgent:
 MetaData:
   num_episodes: 2000
   seed: 0
-  set: DebugDQN
+  set: DebugDQNBSpline
   training_sim_time: 40.0
-  trial_num: 3
+  trial_num: 0
 
 RewardDefinition:
   component0:

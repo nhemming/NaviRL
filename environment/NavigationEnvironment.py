@@ -12,7 +12,7 @@ import pandas as pd
 import yaml
 
 # own modules
-from environment.ActionOperation import BSplineControl, DirectVectorControl
+from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl
 from environment.BaseAgent import SingleLearningAlgorithmAgent
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
@@ -216,7 +216,7 @@ class NavigationEnvironment:
     def load_learning_agent(self):
         """
         Reads the input file and creates the learning agents that act in the environment. Learning agents can have
-        more than one RL learning algorithm assciated with it.
+        more than one RL learning algorithm associated with it.
         :return:
         """
 
@@ -278,7 +278,9 @@ class NavigationEnvironment:
         ao = self.h_params['LearningAgent']['ActionOperation']
 
         # load the controller
-        controller = self.load_controller(ao['controller'])
+        controller = None
+        if 'controller' in list(ao.keys()):
+            controller = self.load_controller(ao['controller'])
 
         if ao['name'] == 'direct_vector_control':
             op = DirectVectorControl(ao['action_options'], None, ao['frequency'], ao['is_continuous'], ao['name'],
@@ -287,6 +289,10 @@ class NavigationEnvironment:
 
             op = BSplineControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
                                      ao['number_controls'], None, ao['segment_length'], ao['target_entity'])
+
+        elif ao['name'] == 'dubins_control':
+            op = DubinsControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
+                                     ao['number_controls'], None, ao['target_entity'])
 
         else:
             raise ValueError('Invalid action operation designation')
