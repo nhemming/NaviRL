@@ -3,6 +3,7 @@ Action operations are the functions that convert raw neural network outputs to t
 entities to update themselves.
 """
 # native modules
+import copy
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 import itertools
@@ -18,13 +19,16 @@ from environment.Entity import get_angle_between_vectors
 
 class ActionOperation(ABC):
 
-    def __init__(self,action_options_dict, controller, frequency, is_continuous, name, number_controls, output_range=None):
+    def __init__(self,action_options_dict, controller, frequency, is_continuous, name, number_controls):
 
         if is_continuous:
             # TODO need to test
             self.action_bounds = []
             for name, value in action_options_dict.items():
-                self.action_bounds.append([float(i) for i in value.split(",")])
+                if isinstance(value, str):
+                    self.action_bounds.append([float(i) for i in value.split(",")])
+                else:
+                    self.action_bounds.append([value])
         else:
             # reshape to vector
             action_option_vals = []
@@ -41,11 +45,8 @@ class ActionOperation(ABC):
         self.is_continuous = is_continuous
         self.name = name
 
-        if is_continuous:
-            self.output_range = [float(i) for i in output_range.split(",")]
-        else:
-            self.output_range = None
         self.num_controls = number_controls
+        self.output_range = [-1,1] # This assumes all actors or continuous agents have a tanh ending activation function.
 
     @abstractmethod
     def convert_action(self, action_vector, delta_t, entities, sensors):
@@ -54,8 +55,8 @@ class ActionOperation(ABC):
 
 class DirectVectorControl(ActionOperation):
 
-    def __init__(self, action_options_dict, controller, frequency, is_continuous, name, number_controls, output_range=None):
-        super(DirectVectorControl, self).__init__(action_options_dict,controller,frequency,is_continuous,name, number_controls,output_range)
+    def __init__(self, action_options_dict, controller, frequency, is_continuous, name, number_controls):
+        super(DirectVectorControl, self).__init__(action_options_dict,controller,frequency,is_continuous,name, number_controls)
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
@@ -92,8 +93,7 @@ class BSplineControl(ActionOperation):
         :param number_controls:
         :param output_range:
         """
-        super(BSplineControl, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls,
-                                                  output_range)
+        super(BSplineControl, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls)
 
         self.segment_length = segment_length # the length of the segments between the control points that define the b-spline
         self.n_samples = 10  # number of points along the bspline path used for navigating
@@ -104,10 +104,30 @@ class BSplineControl(ActionOperation):
         self.start_angle = None
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
+        """
+        Converts the output of a neural network into (an) actuator(s) change. Various methods can be used to make this
+        conversion. Here a B-spline path is built from the outputs of a neural network. Then a controller works to
+        follow the b-spline path.
+
+        :param action_vector: The vector of outputs from the neural network. In the discrete case, only an integer is
+            provided. The integer has the index of the meta data from a combinatorial previously calculated. For the
+            continuous case, the changes are directly provided.
+        :param delta_t: The time step of the simulation. Needed for the controller to calculate the actuator changes
+            for the agents.
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
+        :return: The command that is in the dimensions that are appropriate for the entity to update its control scheme
+            with.
+        """
 
         if self.is_continuous:
             # TODO Don't know if this block is needed. May need scaling.
-            path_angles = action_vector
+            path_angles = copy.deepcopy(action_vector)
+            for i, action in enumerate(action_vector):
+                path_angles[i] = (action - self.output_range[0]) * (
+                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+
         else:
             # discrete
             path_angles = self.action_options[action_vector]
@@ -204,6 +224,15 @@ class BSplineControl(ActionOperation):
         return samples
 
     def setPersistentInfo(self,entities,sensors):
+        """
+        Save information about the action chosen at the simulation step it is chosen. This enables only storing copies
+        of the needed information needed to reconstruct the action. For the bspline, the angles and starting conditions
+        are what is needed to rebuild the bspline. s
+
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
+        :return:
+        """
 
         # save the root of the bsline to build the spline from
         self.start_location = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos']]
@@ -219,8 +248,21 @@ class BSplineControl(ActionOperation):
 class DubinsControl(ActionOperation):
 
     def __init__(self, action_options_dict, controller, frequency, is_continuous, name, number_controls,output_range, target_entity):
-        super(DubinsControl, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls,
-                                                  output_range)
+        """
+        An action operation that converts a raw neural network output to a series of samples that are along a dubins
+        path. A controller then uses the samples along the path to generate actuator commands to minimize the distance
+        to the sample point. The action of the agent is effectively a dubins path.
+
+        :param action_options_dict:
+        :param controller:
+        :param frequency:
+        :param is_continuous:
+        :param name:
+        :param number_controls:
+        :param output_range:
+        :param target_entity:
+        """
+        super(DubinsControl, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls)
 
         self.n_samples = 15  # number of points along the bspline path used for navigating
         self.target_entity = target_entity
@@ -240,14 +282,17 @@ class DubinsControl(ActionOperation):
             continuous case, the changes are directly provided.
         :param delta_t: The time step of the simulation. Needed for the controller to calculate the actuator changes
             for the agents.
-        :param entities:
-        :param sensors:
-        :return:
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
+        :return: The command that is in the dimensions that are appropriate for the entity to update its control scheme
+            with.
         """
 
         if self.is_continuous:
             # TODO Don't know if this block is needed. May need scaling.
-            path_description = action_vector
+            path_description = copy.deepcopy(action_vector)
+            for i, action in enumerate(action_vector):
+                path_description[i] = (action - self.output_range[0]) * (self.action_bounds[i][1]-self.action_bounds[i][0]) / (self.output_range[1]-self.output_range[0]) + self.action_bounds[i][0]
         else:
             # discrete
             path_description = self.action_options[action_vector]
@@ -541,8 +586,8 @@ class DubinsControl(ActionOperation):
         """
         Save information about the first time an action is built. This allows for the simulation to get more
         actuator command updates while keep the original information needed to build the dubins path.
-        :param entities:
-        :param sensors:
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
         :return:
         """
 

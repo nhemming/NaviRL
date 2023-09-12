@@ -25,8 +25,12 @@ Environment:
 ExplorationStrategies:
   strategy1:
     name: EpsilonGreedy_0
+    distribution: # mean, std of each action variable
+      dist0: 0.0,0.1
+      dist1: 0.0,0.1
+      dist2: 0.0,0.1
     threshold_schedule:
-      point0: 0,0.95
+      point0: 0,0.95 # x point, threshold for if a random number is added
       point1: 500,0.2
     type: EpsilonGreedy
 LearningAgent:
@@ -35,25 +39,26 @@ LearningAgent:
   type: SingleLearningAlgorithmAgent
   ActionOperation:
     alg_name: basic_control
-    frequency: 0.5 # [s]
-    is_continuous: False
-    name: direct_vector_control
+    frequency: 2.0 # [s]
+    is_continuous: True
+    name: bspline_control
 
     # discreet solution
     number_controls: 1 # [-]
+    segment_length: 1
+    target_entity: learning_entity
+    controller:
+      type: pd
+      p: 1.0
+      d: 0.01
 
     # used to describe the options available for the discrete case and the bounds for each action
     # in the continuous actions.
     action_options:
-      #option0: -0.392699082,-0.087266463,-0.017453293,0,0.017453293,0.087266463,0.392699082
-      option0: -0.392699082,0,0.392699082
+      option0: -0.392699082,0.392699082  # minimum and maximum
+      option1: -0.392699082,0.392699082
+      option2: -0.392699082,0.392699082
 
-
-    # continuous solution vv
-    #number_controls: 1 # [-]
-    #bounds:
-    #  bounds0: -0.785398,0.785398 # [rad]
-    # continuous solution ^^
   ControlledEntity: learning_entity
   device: cuda
   LearningAlgorithm:
@@ -61,10 +66,11 @@ LearningAgent:
       batch_size: 512
       exploration_strategy: EpsilonGreedy_0
       gamma: 0.9
-      name: DQN_0
+      name: DDPG_0
       num_batches: 32
       target_update_rate: 1
-      type: DQN
+      tau: 0.025
+      type: DDPG
       Input:
         head0:
           item0:
@@ -88,7 +94,22 @@ LearningAgent:
             max: 20 # [m]
             norm_min: 0 # [-]
             norm_max: 1 # [-]
-      Network:
+      NetworkActor:
+        initializer: xavier
+        head0:
+          #batch_norm: False
+          dropout: 0.0 # [-]
+          hidden_activation: relu
+          hidden_layers: 32 # 64,64
+        tail:
+          #batch_norm: False
+          dropout: 0.0
+          hidden_activation: relu
+          hidden_layers: 32
+          last_activation: tanh
+          # only needed for continuous case
+          #output_range: -1,1 # [-]
+      NetworkCritic:
         initializer: xavier
         head0:
           #batch_norm: False
@@ -106,7 +127,7 @@ LearningAgent:
       Optimizer:
         beta1: 0.9
         beta2: 0.999
-        learning_agent: DQN_0
+        learning_agent: DDPG_0
         lr: 0.001
         name: adam_0
         type: adam
@@ -117,7 +138,7 @@ LearningAgent:
 MetaData:
   num_episodes: 1000
   seed: 0
-  set: DebugDQNVector
+  set: DebugDDPGBSpline
   training_sim_time: 20.0
   trial_num: 1
 
@@ -128,19 +149,19 @@ RewardDefinition:
     goal_dst: 1.0
     reward: 1.0
     target_agent: general_nav_0
-    target_lrn_alg: DQN_0
+    target_lrn_alg: DDPG_0
     type: reach_destination
   component1:
     adj_factor: 0.01
     destination_sensor: destination_sensor_0
     target_agent: general_nav_0
-    target_lrn_alg: DQN_0
+    target_lrn_alg: DDPG_0
     type: heading_improvement
   component2:
     adj_factor: 0.1
     destination_sensor: destination_sensor_0
     target_agent: general_nav_0
-    target_lrn_alg: DQN_0
+    target_lrn_alg: DDPG_0
     type: close_distance
   component3:
     adj_factor: 0.01
@@ -148,7 +169,7 @@ RewardDefinition:
     aligned_reward: 1.0
     destination_sensor: destination_sensor_0
     target_agent: general_nav_0
-    target_lrn_alg: DQN_0
+    target_lrn_alg: DDPG_0
     type: aligned_heading
   overall_adj_factor: 1.0
 Sensors:

@@ -59,12 +59,6 @@ LearningAgent:
       option1: -0.392699082,0,0.392699082
       option2: -0.392699082,0,0.392699082
 
-
-    # continuous solution vv
-    #number_controls: 1 # [-]
-    #bounds:
-    #  bounds0: -0.785398,0.785398 # [rad]
-    # continuous solution ^^
   ControlledEntity: learning_entity
   device: cuda
   LearningAlgorithm:

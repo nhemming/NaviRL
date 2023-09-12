@@ -60,7 +60,6 @@ class BaseLearningAlgorithm(ABC):
         # set is_new_action to false.
         pass
 
-    @abstractmethod
     def forward(self,state):
         """
         runs the neural network and returns the output
@@ -165,12 +164,20 @@ class BaseLearningAlgorithm(ABC):
         file_path = os.path.join(base_dir,'learning_algorithm',agent+'_'+self.name+'_loss.csv')
         self.file_path_loss = file_path
         with open(file_path, 'w') as f:
-            f.write("Episode_number,loss\n")
+            f.write(self.loss_header)
 
     def append_to_loss_file(self, ep_num, loss):
-        loss_string = ''
-        for i, loss_val in enumerate(loss):
-            loss_string += str(ep_num) +','+str(loss_val)+'\n'
+        #loss_string = ''
 
-        with open(self.file_path_loss, 'a') as f:
-            f.write(loss_string)
+        tmp_df = pd.DataFrame()
+        tmp_df['Episode_number'] = np.ones_like(loss[list(loss.keys())[0]])*ep_num
+        for name, value in loss.items():
+            tmp_df['loss_'+name] = value
+
+        #for i, loss_val in enumerate(loss): # TODO update to have loss be a dictionary
+        #    loss_string += str(ep_num) +','+str(loss_val)+'\n'
+
+        tmp_df.to_csv(self.file_path_loss, mode='a', index=False, header=False)
+
+        #with open(self.file_path_loss, 'a') as f:
+        #    f.write(loss_string)

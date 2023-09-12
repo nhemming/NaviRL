@@ -14,6 +14,7 @@ import yaml
 # own modules
 from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl
 from environment.BaseAgent import SingleLearningAlgorithmAgent
+from agents.actor_critic_agents.DDPG import DDPG
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Controller import PDController
@@ -195,22 +196,23 @@ class NavigationEnvironment:
 
                 # parse the schedule for the threshold for choosing a random action
                 ts = item['threshold_schedule']
-                threshold_schedule = np.zeros((len(ts),2))
+                #num_entries = len(ts[list(ts.keys())[0]].split(','))
+                num_entries = 2
+                threshold_schedule = np.zeros((len(ts),num_entries))
                 k = 0
                 for tmp_value, tmp_item in ts.items():
                     point = [float(i) for i in tmp_item.split(',')]
                     threshold_schedule[k,:] = point
                     k += 1
 
-                # parse the perterbation distribution definitions
+                # parse the perturbation distribution definitions
                 if self.h_params['LearningAgent']['ActionOperation']['is_continuous']:
-                    # TODO
                     ds = item['distribution']
-                    perturb = None
                 else:
-                    perturb = self.h_params['LearningAgent']['ActionOperation']['action_options']
+                    ds = None
+                action_definition = self.h_params['LearningAgent']['ActionOperation']['action_options']
 
-                eg = EpsilonGreedy(self.h_params['LearningAgent']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, perturb)
+                eg = EpsilonGreedy(self.h_params['LearningAgent']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, action_definition, ds)
                 self.exploration_strategies[eg.name] = eg
 
     def load_learning_agent(self):
@@ -262,7 +264,33 @@ class NavigationEnvironment:
                             replay_buffer,
                             self.h_params['MetaData']['seed'])
                 agent.learning_algorithms[dqn.name] = dqn
-                #@self.agents[agent.name] = agent
+
+            elif lrn_alg_data['type'] == 'DDPG':
+                # create a DDPG agent
+
+                # parse replay buffer
+                replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
+
+                head_dict = OrderedDict()
+                for head_name, head_data in la_input.items():
+                    row_list = []
+                    for value, item in head_data.items():
+                        row_list.append(item)
+                    obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'], data=row_list)
+                    head_dict[head_name] = obs_df
+
+                ddpg = DDPG(la['device'],
+                          self.exploration_strategies[lrn_alg_data['exploration_strategy']],
+                          lrn_alg_data,
+                          lrn_alg_data['name'],
+                          lrn_alg_data['NetworkActor'],
+                          lrn_alg_data['NetworkCritic'],
+                          head_dict,
+                          optimizer_dict,
+                          len(ao.action_bounds),
+                          replay_buffer,
+                          self.h_params['MetaData']['seed'])
+                agent.learning_algorithms[ddpg.name] = ddpg
 
             else:
                 raise ValueError('Learning Algorithm not supported')

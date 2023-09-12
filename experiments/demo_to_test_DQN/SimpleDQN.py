@@ -8,8 +8,6 @@ import os
 # 3rd party modules0
 
 # own modules
-
-
 from environment.NavigationEnvironment import NavigationEnvironment
 
 

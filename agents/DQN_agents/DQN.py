@@ -8,17 +8,12 @@ import os
 
 # 3rd part modules
 import numpy as np
-import torch
 import torch.nn.functional as F
 
 # own modules
 from agents.BaseLearningAlgorithm import BaseLearningAlgorithm
-
-
-# TODO delete this network after testing is complete
 from environment.NetworkBuilder import Network
 import torch
-import torch.nn as nn
 
 
 class DQN(BaseLearningAlgorithm):
@@ -43,6 +38,7 @@ class DQN(BaseLearningAlgorithm):
         self.target_update_rate = general_params['target_update_rate']
 
         self.last_target_update = -np.infty
+        self.loss_header = "Episode_number,loss\n"
 
     def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
 
@@ -96,7 +92,7 @@ class DQN(BaseLearningAlgorithm):
 
 
             # save the loss value
-            self.append_to_loss_file( ep_num, loss_save)
+            self.append_to_loss_file( ep_num, {'loss':loss_save})
 
             # check and update target network if needed
             if ep_num - self.last_target_update > self.target_update_rate:

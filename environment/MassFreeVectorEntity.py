@@ -21,6 +21,11 @@ class MassFreeVectorEntity(CollideEntity):
         self.state_dict['v_mag'] = 1.0  # velocity the agent moves at in the simulation [m/s]
 
     def step(self, delta_t):
+        """
+        Use Euler stepping to step the entity one step in time.
+        :param delta_t: Time step [s] to step over.
+        :return:
+        """
 
         dx = self.state_dict['v_mag'] * np.cos(self.state_dict['phi']) * delta_t
         dy = self.state_dict['v_mag'] * np.sin(self.state_dict['phi']) * delta_t
@@ -29,7 +34,16 @@ class MassFreeVectorEntity(CollideEntity):
         self.state_dict['y_pos'] += dy
 
     def adj_heading(self, phi_adj):
+        """
+        Changes the heading (phi) of the entity by the passed in amount.
+        :param phi_adj: The amount [rad] to change the heading.
+        :return:
+        """
 
+        if isinstance(phi_adj,np.ndarray):
+            phi_adj = phi_adj[0]
+
+        # correct for the bounds of the change
         if phi_adj > np.deg2rad(45.0):
             phi_adj = np.deg2rad(45.0)
         elif phi_adj < -np.deg2rad(45.0):
@@ -48,8 +62,15 @@ class MassFreeVectorEntity(CollideEntity):
         # reset the heading to a random vector
         self.state_dict['phi'] = np.random.uniform(low=0, high=2.0*np.pi)
 
-
     def apply_action(self, action_vec):
+        """
+        Accepts a vector produced by a neural network. It may not be the direct output, as the actions may have been
+        mutated. This function dispatches the vector to the appropriate model changes.
+        :param action_vec: Vector describing the value of change for the actuators.
+        :return:
+        """
+
+        # adjust the heading of the entity
         self.adj_heading(action_vec)
 
     def draw_trajectory(self, ax, data, sim_time):

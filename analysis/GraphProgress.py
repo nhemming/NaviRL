@@ -37,9 +37,9 @@ def load_environment(base_folder, set_name, trial_num):
 def main():
 
     # set experiments to evaluate
-    base_folder = 'demo_to_test_DQN'
-    set_name = 'DebugDQN'
-    trial_num = 3
+    base_folder = 'demo_to_test_DDPG'
+    set_name = 'DebugDDPGBSpline'
+    trial_num = 1
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)
@@ -122,9 +122,14 @@ def main():
         for tmp_name, lrn_alg in agent.learning_algorithms.items():
             loss_file = os.path.join(file_dir,name+'_'+tmp_name+'_loss.csv')
             df = pd.read_csv(loss_file)
-            ax.semilogy([i for i in range(len(df))],df['loss'],label=name+'_'+tmp_name,alpha=0.2)
-            loss_smooth = uniform_filter1d(df['loss'], 100)
-            ax.semilogy([i for i in range(len(df))], loss_smooth, label=name + '_' + tmp_name)
+
+            cols = list(df.columns)
+            cols.pop(0)
+            for col_name in cols:
+
+                ax.semilogy([i for i in range(len(df))],np.abs(df[col_name]),label=name+'_'+tmp_name+'_'+col_name,alpha=0.2)
+                loss_smooth = uniform_filter1d(np.abs(df[col_name]), 100)
+                ax.semilogy([i for i in range(len(df))], loss_smooth, label=name + '_' + tmp_name+'_'+col_name)
 
     ax.legend()
     file_dir = os.path.join(base_dir, 'progress')
