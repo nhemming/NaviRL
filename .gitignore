@@ -16,7 +16,7 @@ experiments/demo_to_test_DDPG/output/
 experiments/demo_to_test_DQN/output/
 
 # ignore additional design documentation folder
-design_documentation/
+design_documents/
 
 # ignore external nn_builder
 nn_builder/
