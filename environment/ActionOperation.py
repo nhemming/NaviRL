@@ -601,3 +601,215 @@ class DubinsControl(ActionOperation):
         presistentInfo['y_init'] = self.start_location[1]
         presistentInfo['phi_init'] = self.start_angle
         return presistentInfo
+
+
+class RLProbablisticRoadMap(ActionOperation):
+
+    def __init__(self, action_options_dict, controller, frequency, is_continuous, max_edge_dst, name, number_controls, n_samples,output_range, target_entity, model_path='', model_radius=None):
+        """
+        Action operation that a probabilistic road map to help navigate to the goal. The connections in the graph are
+        either built with a simple circle radius model or using a neural network based transition model.
+
+        :param action_options_dict:
+        :param frequency:
+        :param is_continuous:
+        :param name:
+        :param number_controls:
+        :param output_range:
+        """
+        super(RLProbablisticRoadMap, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls)
+
+        self.n_samples = n_samples  # number of points along the bspline path used for navigating
+        self.target_entity = target_entity
+
+        # save information for what transition model to use
+        self.max_edge_dst = max_edge_dst
+        self.model_path = model_path
+        self.model_radius = model_radius
+        self.use_simple_model = True if model_radius is not None else False
+
+        # save information for refreshing.
+        self.vertices = [] # list of the vertices in the graph
+
+
+
+    def convert_action(self, action_vector, delta_t, entities, sensors):
+        """
+        Converts the output of a neural network into (an) actuator(s) change. Various methods can be used to make this
+        conversion. Here a B-spline path is built from the outputs of a neural network. Then a controller works to
+        follow the b-spline path.
+
+        :param action_vector: The vector of outputs from the neural network. In the discrete case, only an integer is
+            provided. The integer has the index of the meta data from a combinatorial previously calculated. For the
+            continuous case, the changes are directly provided.
+        :param delta_t: The time step of the simulation. Needed for the controller to calculate the actuator changes
+            for the agents.
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
+        :return: The command that is in the dimensions that are appropriate for the entity to update its control scheme
+            with.
+        """
+
+        # build a graph
+        path = self.build_prm()
+
+        '''
+        if self.is_continuous:
+            # TODO Don't know if this block is needed. May need scaling.
+            path_angles = copy.deepcopy(action_vector)
+            for i, action in enumerate(action_vector):
+                path_angles[i] = (action - self.output_range[0]) * (
+                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+
+        else:
+            # discrete
+            path_angles = self.action_options[action_vector]
+
+        # build the b spline curve. from the called out angles
+        control_points = np.zeros((len(path_angles)+1,2))
+        control_points[0,:] = np.array(self.start_location)
+        cp_angle = np.zeros(len(path_angles))
+        cp_angle[0] = self.start_angle + path_angles[0]
+        for i in range(len(path_angles)):
+            control_points[i+1,0] = control_points[i,0]+self.segment_length*np.cos(cp_angle[i])
+            control_points[i+1, 1] = control_points[i, 1] + self.segment_length * np.sin(cp_angle[i])
+            if i < len(path_angles)-1:
+                cp_angle[i+1] = cp_angle[i] + path_angles[i+1]
+
+        samples = self.bezier_curve( control_points, self.n_samples)
+
+        # get the point that is nearest to the agent, then advance one
+        idx = 0
+        min_dst = np.infty
+
+        # get the current position of the entity
+        entity_x = entities[self.target_entity].state_dict['x_pos']
+        entity_y = entities[self.target_entity].state_dict['y_pos']
+        for i, samp in enumerate(samples):
+            tmp_dst = np.sqrt( (samp[0]-entity_x)**2 + (samp[1]-entity_y)**2)
+            if tmp_dst < min_dst:
+                min_dst = tmp_dst
+                idx = i
+        # increment the index by 1 if possible.
+        if idx < len(samples)-1:
+            idx += 1
+            
+        '''
+
+        # use the controller to produce a change to the agent
+        heading = entities[self.target_entity].state_dict['phi']
+
+        rot_mat = [[np.cos(heading), np.sin(heading), 0.0],
+                   [-np.sin(heading), np.cos(heading), 0.0],
+                   [0.0, 0.0, 1.0]]
+        rot_mat = np.reshape(rot_mat, (3, 3))
+
+        diff = np.subtract([samples[idx,0],samples[idx,1],samples[idx,2]], [entity_x,entity_y,heading])
+
+        error_vec = np.matmul(rot_mat, diff)
+
+        v_mag = np.sqrt(entities[self.target_entity].state_dict['v_mag'])
+        command = self.controller.get_command(delta_t,error_vec,v_mag)
+
+        # return the transfromed action
+        return command
+
+    def build_prm(self):
+
+        # build the verticies of the PRM
+        self.vertices = []
+        self.vertices.append(VertexPRM(start_loc,state=state))
+        for i in range(self.n_samples):
+            # TODO need domain for low and high values
+            location = np.random.uniform(low=domain[0], high=domain[1], size=(2,))
+            self.vertices.append(VertexPRM(location))
+
+        self.vertices.append(VertexPRM(goal_loc))
+
+        # try to connect the nodes in the PRM with a simple arc
+        open_verts = [self.vertices[0]]
+        counts = 0
+        while len(open_verts) > 0 and counts < len(self.vertices) + 1:
+            counts += 1
+            current_vert = open_verts.pop()
+            for i, tmp_vert in enumerate(self.vertices):
+                if tmp_vert != current_vert:
+
+                    curr_state = current_vert.state
+
+                    dst = np.sqrt((current_vert.location[0] - tmp_vert.location[0]) ** 2 + (
+                                current_vert.location[1] - tmp_vert.location[1]) ** 2)
+                    dst_to_org = 0.0  # distance from current location to current_vert
+
+
+                    if self.use_simple_model:
+                        # use a simple arc model for determining if the node is reachable
+
+                        # get angle from current heading to tmp vertex
+                        delta_x = tmp_vert.location[0]- current_vert.location[0]
+                        delta_y = tmp_vert.location[1] - current_vert.location[1]
+                        theta = np.arctan2(delta_y, delta_x)
+                        mu1 = theta - curr_state['psi']
+                        if mu1 >= 0:
+                            mu2 = np.pi * 2.0 - mu1  # explementary angle
+                        else:
+                            mu2 = np.pi * 2.0 + mu1  # explementary angle
+                        mu_v = [mu1, mu2]
+                        ind = np.argmin(np.abs(mu_v))
+                        mu = mu_v[ind]
+
+                        if np.abs(mu) > np.pi/2.0:
+                            gamma = mu-np.pi/2.0
+                        else:
+                            gamma = np.pi/2.0
+
+                        arc_radius = dst*np.sin(gamma)/np.sin(np.pi-2.0*gamma)
+
+                        if arc_radius >= self.model_radius:
+                            # can reach the point. Make the connection and add the node to the open set.
+
+                            if tmp_vert not in current_vert.children and current_vert not in tmp_vert.children:
+                                current_vert.children.append(tmp_vert)
+                                open_verts.append(tmp_vert)
+                    else:
+                        # TODO
+                        # use a surrogate model for determining if the next node is reachable
+                        pass
+
+    def setPersistentInfo(self,entities,sensors):
+        """
+        Save information about the action chosen at the simulation step it is chosen. This enables only storing copies
+        of the needed information needed to reconstruct the action. For the bspline, the angles and starting conditions
+        are what is needed to rebuild the bspline. s
+
+        :param entities: An ordered dictionary containing the entities in the simulation.
+        :param sensors: An ordered dictionary containing the sensors in a simulation.
+        :return:
+        """
+
+        '''
+        # save the root of the bsline to build the spline from
+        self.start_location = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos']]
+        self.start_angle = entities[self.target_entity].state_dict['phi']
+
+        presistentInfo = OrderedDict()
+        presistentInfo['x_init'] = self.start_location[0]
+        presistentInfo['y_init'] = self.start_location[1]
+        presistentInfo['phi_init'] = self.start_angle
+        '''
+
+        #save the build graph for later use
+
+        return presistentInfo
+
+class VertexPRM():
+
+    def __init__(self, location, state=None):
+        self.children = []
+        self.parent = None
+        self.location = location
+        self.state = state
+        self.g = 0
+        self.h = 0
+        self.f = 0
