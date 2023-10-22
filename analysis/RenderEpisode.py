@@ -228,9 +228,9 @@ def main():
 
     # set experiments to evaluate
     base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGBSpline'
-    trial_num = 3
-    ep_num_vec = range(1000,1020)
+    set_name = 'DebugDDPGDubins'
+    trial_num = 1
+    ep_num_vec = range(400,410)
     create_video = True
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')

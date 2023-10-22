@@ -479,6 +479,9 @@ class NavigationEnvironment:
 
         while not done and sim_time < max_time:
 
+            # TODO remove print
+            #print(sim_time)
+
             # need a prep state action. Most action operations do not need this. Only when the action operation effects
             # the input state of the neural network, does a function in this call stack become activated.
             for name, tmp_agent in self.agents.items():

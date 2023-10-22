@@ -304,15 +304,18 @@ class BSplineControl(ActionOperation):
             path_angles = angle_df['val'].to_numpy()
 
             # un-normalize angles
-            for i, action in enumerate(path_angles):
-                path_angles[i] = (action - self.output_range[0]) * (
-                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
-                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+            if self.is_continuous:
+                for i, action in enumerate(path_angles):
+                    path_angles[i] = (action - self.output_range[0]) * (
+                                self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                                   self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+            else:
+                # discrete
+                path_angles = self.action_options[path_angles]
 
             samples = self.build_spline_from_angles(path_angles)
 
             ax.plot(samples[:,0], samples[:,1], 'o--', color='gray')
-
 
 
 class DubinsControl(ActionOperation):
@@ -365,7 +368,6 @@ class DubinsControl(ActionOperation):
         """
 
         if self.is_continuous:
-            # TODO Don't know if this block is needed. May need scaling.
             path_description = copy.deepcopy(action_vector)
             for i, action in enumerate(action_vector):
                 path_description[i] = (action - self.output_range[0]) * (self.action_bounds[i][1]-self.action_bounds[i][0]) / (self.output_range[1]-self.output_range[0]) + self.action_bounds[i][0]
@@ -374,14 +376,17 @@ class DubinsControl(ActionOperation):
             path_description = self.action_options[action_vector]
 
         # build the dubins path and get eht samples
-        start = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos'],entities[self.target_entity].state_dict['phi']]
-        end_theta = entities[self.target_entity].state_dict['phi']+path_description[0]+path_description[2]
+        #start = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos'],entities[self.target_entity].state_dict['phi']]
+        #end_theta = entities[self.target_entity].state_dict['phi']+path_description[0]+path_description[2]
+        start = [self.start_location[0], self.start_location[1],
+                 self.start_angle]
+        end_theta = self.start_angle + path_description[0] + path_description[2]
         if end_theta > np.pi*2.0:
             end_theta -= np.pi*2.0
         elif end_theta < 0.0:
             end_theta += np.pi*2.0
-        end = [entities[self.target_entity].state_dict['x_pos'] + path_description[1]*np.cos(entities[self.target_entity].state_dict['phi']+path_description[0]),
-               entities[self.target_entity].state_dict['y_pos'] + path_description[1]*np.sin(entities[self.target_entity].state_dict['phi']+path_description[0]),
+        end = [self.start_location[0] + path_description[1]*np.cos(self.start_angle + path_description[0]),
+               self.start_location[1] + path_description[1]*np.sin(self.start_angle + path_description[0]),
                end_theta]
         radius = path_description[3]
         samples = self.build_shortest_dubins( start, end, radius, radius)
@@ -416,6 +421,27 @@ class DubinsControl(ActionOperation):
 
         v_mag = np.sqrt(entities[self.target_entity].state_dict['v_mag'])
         command = self.controller.get_command(delta_t,error_vec,v_mag)
+
+        # TODO remove after debugging
+        '''
+        print('samples')
+        for samp in samples:
+            for val in samp:
+                print(val, end="")
+                print(",", end="")
+            print()
+        print('target')
+        for val in samples[idx,:]:
+            print(val, end="")
+            print(",", end="")
+        print()
+        print("command")
+        print(command)
+        print()
+        print("entity")
+        print(entity_x,end=",")
+        print(entity_y )
+        '''
 
         # return the transfromed action
         return command
@@ -641,7 +667,7 @@ class DubinsControl(ActionOperation):
         :return: A list of samples [x,y,theta] that describe the shortest length dubins path.
         """
 
-        n_samples = 40
+        n_samples = 15
         turn_combos = [['right', 'right'],
                        ['right', 'left'],
                        ['left', 'right'],
@@ -677,6 +703,67 @@ class DubinsControl(ActionOperation):
         presistentInfo['y_init'] = self.start_location[1]
         presistentInfo['phi_init'] = self.start_angle
         return presistentInfo
+
+    def draw_persistent(self, ax, df, sim_time):
+
+        # collect the path at the current time
+        slice = df[df['sim_time'] <= sim_time]
+        slice_len = len(slice)-1
+
+        if len(slice) != 0:
+
+            path_description = []
+            # un-normalize angles
+            if self.is_continuous:
+
+                #path_def = []
+                path_cols = slice[[col for col in df.columns if "mutated_action" in col]]
+                col_names = list(path_cols.columns)
+                path_dict = dict()
+                for col in col_names:
+                    part_col = col.split('_')
+                    point_num = int(part_col[len(part_col) - 1])
+
+                    path_dict[point_num] = path_cols[col].iloc[slice_len]
+
+                angle_df = pd.DataFrame(path_dict.items(), columns=['def', 'val'])
+                angle_df.sort_values(by=['def'], inplace=True)
+                path_def = angle_df['val'].to_numpy()
+
+
+
+                path_description = copy.deepcopy(path_def)
+                for i, action in enumerate(path_def):
+                    path_description[i] = (action - self.output_range[0]) * (
+                                self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                                      self.output_range[1] - self.output_range[0]) + \
+                                          self.action_bounds[i][0]
+
+            else:
+                # discrete
+                #path_description = self.action_options[action_vector]
+                pass
+
+            x_pos = slice['persistent_info_x_init'].iloc[slice_len]
+            y_pos = slice['persistent_info_y_init'].iloc[slice_len]
+            phi = slice['persistent_info_phi_init'].iloc[slice_len]
+
+            # build the dubins path and get eht samples
+            start = [x_pos,
+                     y_pos,
+                     phi]
+
+            end_theta = phi + path_description[0] + path_description[2]
+            if end_theta > np.pi * 2.0:
+                end_theta -= np.pi * 2.0
+            elif end_theta < 0.0:
+                end_theta += np.pi * 2.0
+            end = [x_pos + path_description[1] * np.cos(phi + path_description[0]),
+                   y_pos + path_description[1] * np.sin(phi + path_description[0]),
+                   end_theta]
+            radius = path_description[3]
+            samples = self.build_shortest_dubins(start, end, radius, radius)
+            ax.plot(samples[:,0], samples[:,1], 'o--', color='gray')
 
 
 class RLProbablisticRoadMap(ActionOperation):

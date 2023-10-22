@@ -17,9 +17,9 @@ Entities:
 Environment:
   domain:
     min_x: 0 # [m]
-    max_x: 5 # [m]
+    max_x: 50 # [m]
     min_y: 0 # [m]
-    max_y: 5 # [m]
+    max_y: 50 # [m]
     buffer: 0.5 # [m]
   time_step: 0.5 # [s]
 ExplorationStrategies:
@@ -32,7 +32,7 @@ ExplorationStrategies:
       dist3: 0.0,0.0000001
     threshold_schedule:
       point0: 0,0.95 # x point, threshold for if a random number is added
-      point1: 500,0.2
+      point1: 1500,0.2
     type: EpsilonGreedy
 LearningAgent:
   name: general_nav_0
@@ -40,13 +40,13 @@ LearningAgent:
   type: SingleLearningAlgorithmAgent
   ActionOperation:
     alg_name: basic_control
-    frequency: 2.0 # [s]
+    frequency: 10.0 # [s]
     is_continuous: True
     name: dubins_control
 
     # discreet solution
     number_controls: 1 # [-]
-    segment_length: 1
+    #segment_length: 20
     target_entity: learning_entity
     controller:
       type: pd
@@ -57,8 +57,8 @@ LearningAgent:
     # in the continuous actions.
     action_options:
       option0: -3.141592654,3.141592654 # describes the angle to the end point from the own principle axis.
-      option1:  9.9999,10.0 # describes the distance the point is away from the own origin. Needs to be at least 4*r
-      option2: -3.141592654,3.141592654 # describes the ending points angle reltive to the vector pointing to its base
+      option1:  14.999,15.0 # describes the distance the point is away from the own origin. Needs to be at least 4*r
+      option2: -3.141592654,3.141592654 # describes the ending points angle relative to the vector pointing to its base
       option3: 1.9999,2.0 #describes the radius [m] of the turns in the dubins path.
 
   ControlledEntity: learning_entity
@@ -138,11 +138,11 @@ LearningAgent:
         type: vanilla
   
 MetaData:
-  num_episodes: 1000
+  num_episodes: 2000
   seed: 0
   set: DebugDDPGDubins
-  training_sim_time: 20.0
-  trial_num: 0
+  training_sim_time: 100.0
+  trial_num: 1
 
 RewardDefinition:
   component0:
