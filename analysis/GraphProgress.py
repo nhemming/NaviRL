@@ -39,7 +39,7 @@ def main():
     # set experiments to evaluate
     base_folder = 'demo_to_test_DDPG'
     set_name = 'DebugDDPGBSpline'
-    trial_num = 1
+    trial_num = 3
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)
@@ -77,7 +77,7 @@ def main():
 
     file_dir = os.path.join(base_dir, 'training', 'sensors')
     dir_list = os.listdir(file_dir)
-    dir_list = [i for i in dir_list if 'destination_sensor_0' in i]
+    dir_list = [i for i in dir_list if 'destination_sensor_0' in i and 'sub' not in i]
     df['success'] = 0.0
     for i, file in enumerate(dir_list):
         tmp_file = os.path.join(file_dir,'destination_sensor_0_epnum-' + str(i) + '.csv')

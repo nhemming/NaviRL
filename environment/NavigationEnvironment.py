@@ -12,7 +12,7 @@ import pandas as pd
 import yaml
 
 # own modules
-from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl
+from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl, RLProbablisticRoadMap
 from environment.BaseAgent import SingleLearningAlgorithmAgent
 from agents.actor_critic_agents.DDPG import DDPG
 from agents.DQN_agents.DQN import DQN
@@ -20,7 +20,7 @@ from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
-from environment.Sensor import DestinationSensor
+from environment.Sensor import DestinationSensor, SubDestinationSensor
 from environment.StaticEntity import StaticEntity, StaticEntityCollide
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
 from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
@@ -118,7 +118,7 @@ class NavigationEnvironment:
             training_dir = os.path.join(output_dir, 'training')
             if not os.path.isdir(training_dir):
                 os.mkdir(training_dir)
-            train_sub_dir = ['sensors','entities','learning_algorithm','graphs']
+            train_sub_dir = ['sensors','entities','learning_algorithm','graphs','videos']
             for tsd in train_sub_dir:
                 tmp_dir = os.path.join(training_dir, tsd)
                 if not os.path.isdir(tmp_dir):
@@ -180,6 +180,9 @@ class NavigationEnvironment:
             if item['type'] == 'destination_sensor':
                 ds = DestinationSensor(item['id'], item['name'], item['owner'], item['target'])
                 self.sensors[ds.name] = ds
+            elif item['type'] == 'sub_destination_sensor':
+                sds = SubDestinationSensor(item['id'], item['name'], item['owner'])
+                self.sensors[sds.name] = sds
             else:
                 raise ValueError('Invalid Sensor Type')
 
@@ -322,6 +325,19 @@ class NavigationEnvironment:
             op = DubinsControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
                                      ao['number_controls'], None, ao['target_entity'])
 
+        elif ao['name'] == 'rl_probablistic_road_map':
+
+            model_radius = ao.get('model_radius',None)
+            model_path = ao.get('model_path',None)
+            use_simple_model = False
+            if model_radius is not None:
+                use_simple_model = True
+
+            op = RLProbablisticRoadMap(ao['action_options'],None,self.domain,ao['frequency'],ao['graph_frequency'],ao['is_continuous'],
+                                       ao['max_connect_dst'], ao['name'], ao['number_controls'],ao['n_samples'], None,
+                                       ao['target_entity'], ao['target_sensor'], ao['trans_dst'], use_simple_model,model_path,
+                                       model_radius)
+
         else:
             raise ValueError('Invalid action operation designation')
 
@@ -455,7 +471,18 @@ class NavigationEnvironment:
         for name, reward_comp in self.reward_function.reward_components.items():
             reward_comp.reset(self.entities, self.sensors, self.reward_function.reward_agents)
 
+        # init action operation functions.
+        # loop over agents and precalculate action operation information. Most action operations do not use this.
+        # this function is only called when the input
+        for name, tmp_agent in self.agents.items():
+            tmp_agent.init_state_action(self.entities, self.sensors)
+
         while not done and sim_time < max_time:
+
+            # need a prep state action. Most action operations do not need this. Only when the action operation effects
+            # the input state of the neural network, does a function in this call stack become activated.
+            for name, tmp_agent in self.agents.items():
+                tmp_agent.prep_state_action(self.entities, self.sensors, sim_time)
 
             # loop over agents both learning and non-learning
             # select action -> state_dict, action_dict
@@ -475,7 +502,7 @@ class NavigationEnvironment:
                 tmp_sensor.update(sim_time, self.entities, self.sensors)
 
             # get reward of the step
-            reward = self.reward_function.calculate_reward(self.entities, self.sensors)
+            reward = self.reward_function.calculate_reward(sim_time,self.entities, self.sensors)
 
             # look for collisions and set agent to inactive if collided
             self.set_collision_status()

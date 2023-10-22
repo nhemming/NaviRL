@@ -147,7 +147,7 @@ class RLPRM:
 
         # set current waypoint to goal if no path exists.
         if path == [] or count >= len(self.vertices):
-            path = [VertexPRM(goal_loc)]
+            path = [VertexPRM(start_loc),VertexPRM(goal_loc)]
 
         x_path = []
         y_path = []
@@ -213,7 +213,7 @@ class RLPRM:
             # add the start node to the path
             path.append(start)
 
-        return path, count
+        return reversed(path), count
 
 class VertexPRM():
 
@@ -241,6 +241,7 @@ def main():
 
     start_loc = [4.0,4.0]
     goal_loc = [9.0,9.0]
+    #goal_loc = [15., 15.0]
     state = OrderedDict()
     state['psi'] = 0.0
     prm.build_prm(goal_loc,start_loc,state)

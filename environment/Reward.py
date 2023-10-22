@@ -20,10 +20,10 @@ class RewardDefinition:
         self.overall_adj_factor = None
         self.reward_agents = {key: OrderedDict() for key in agent_names}
 
-    def calculate_reward(self, entities, sensors):
+    def calculate_reward(self, sim_time, entities, sensors):
 
         for name, value in self.reward_components.items():
-            value.calculate_reward(entities, sensors, self.reward_agents)
+            value.calculate_reward(sim_time,entities, sensors, self.reward_agents)
         return self.reward_agents
 
 
@@ -36,7 +36,7 @@ class RewardComponent(ABC):
         self.target_lrn_alg = target_lrn_alg
 
     @abstractmethod
-    def calculate_reward(self,entities, sensors, reward_agents):
+    def calculate_reward(self,sim_time,entities, sensors, reward_agents):
         pass
 
     def reset(self, entities, sensors, reward_agents):
@@ -58,7 +58,7 @@ class AlignedHeadingReward(RewardComponent):
         self.destination_sensor = destination_sensor
         self.old_heading_offset = None
 
-    def calculate_reward(self,entities, sensors, reward_agents):
+    def calculate_reward(self,sim_time,entities, sensors, reward_agents):
 
         heading_offset = sensors[self.destination_sensor].state_dict['angle']
 
@@ -81,7 +81,7 @@ class CloseDistanceReward(RewardComponent):
         reward_agents[self.target_agent][self.target_lrn_alg] = 0.0
 
 
-    def calculate_reward(self, entities, sensors, reward_agents):
+    def calculate_reward(self, sim_time,entities, sensors, reward_agents):
 
         dst = sensors[self.destination_sensor].state_dict['distance']
 
@@ -102,7 +102,7 @@ class ImproveHeadingReward(RewardComponent):
         self.old_heading_offset = sensors[self.destination_sensor].state_dict['angle']
         reward_agents[self.target_agent][self.target_lrn_alg] = 0.0
 
-    def calculate_reward(self,entities, sensors, reward_agents):
+    def calculate_reward(self,sim_time,entities, sensors, reward_agents):
 
         heading_offset = sensors[self.destination_sensor].state_dict['angle']
 
@@ -123,13 +123,16 @@ class ReachDestinationReward(RewardComponent):
         self.goal_dst = goal_dst
         self.reward = reward
 
-    def calculate_reward(self,entities, sensors, reward_agents):
+    def calculate_reward(self,sim_time,entities, sensors, reward_agents):
 
-        curr_dst = sensors[self.destination_sensor].state_dict['distance']
+        if sim_time > 1e-12:
+            # not allowed to recieve reward for being at the goal location at the intiailization of the simulation. Fix for sub desntionation based sensors
 
-        if curr_dst <= self.goal_dst:
+            curr_dst = sensors[self.destination_sensor].state_dict['distance']
 
-            reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
+            if curr_dst <= self.goal_dst:
+
+                reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
 
     def reset(self,entities, sensors, reward_agents):
         reward_agents[self.target_agent][self.target_lrn_alg] = 0.0

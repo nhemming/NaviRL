@@ -11,6 +11,7 @@ import itertools
 
 # 3rd party modules
 import numpy as np
+import pandas as pd
 from scipy.special import comb
 
 # own modules
@@ -58,6 +59,12 @@ class DirectVectorControl(ActionOperation):
     def __init__(self, action_options_dict, controller, frequency, is_continuous, name, number_controls):
         super(DirectVectorControl, self).__init__(action_options_dict,controller,frequency,is_continuous,name, number_controls)
 
+    def init_state_action(self, entities, sensors):
+        pass
+
+    def prep_state_action(self, entities, sensors, sim_time):
+        pass
+
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
         Simple scaling of outputs of the network to the dimensions of the action control
@@ -103,6 +110,12 @@ class BSplineControl(ActionOperation):
         self.start_location = []
         self.start_angle = None
 
+    def init_state_action(self, entities, sensors):
+        pass
+
+    def prep_state_action(self, entities, sensors, sim_time):
+        pass
+
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
         Converts the output of a neural network into (an) actuator(s) change. Various methods can be used to make this
@@ -121,7 +134,6 @@ class BSplineControl(ActionOperation):
         """
 
         if self.is_continuous:
-            # TODO Don't know if this block is needed. May need scaling.
             path_angles = copy.deepcopy(action_vector)
             for i, action in enumerate(action_vector):
                 path_angles[i] = (action - self.output_range[0]) * (
@@ -133,6 +145,7 @@ class BSplineControl(ActionOperation):
             path_angles = self.action_options[action_vector]
 
         # build the b spline curve. from the called out angles
+        '''
         control_points = np.zeros((len(path_angles)+1,2))
         control_points[0,:] = np.array(self.start_location)
         cp_angle = np.zeros(len(path_angles))
@@ -144,6 +157,8 @@ class BSplineControl(ActionOperation):
                 cp_angle[i+1] = cp_angle[i] + path_angles[i+1]
 
         samples = self.bezier_curve( control_points, self.n_samples)
+        '''
+        samples = self.build_spline_from_angles(path_angles)
 
         # get the point that is nearest to the agent, then advance one
         idx = 0
@@ -178,6 +193,21 @@ class BSplineControl(ActionOperation):
 
         # return the transfromed action
         return command
+
+    def build_spline_from_angles(self, path_angles):
+
+        control_points = np.zeros((len(path_angles) + 1, 2))
+        control_points[0, :] = np.array(self.start_location)
+        cp_angle = np.zeros(len(path_angles))
+        cp_angle[0] = self.start_angle + path_angles[0]
+        for i in range(len(path_angles)):
+            control_points[i + 1, 0] = control_points[i, 0] + self.segment_length * np.cos(cp_angle[i])
+            control_points[i + 1, 1] = control_points[i, 1] + self.segment_length * np.sin(cp_angle[i])
+            if i < len(path_angles) - 1:
+                cp_angle[i + 1] = cp_angle[i] + path_angles[i + 1]
+
+        samples = self.bezier_curve(control_points, self.n_samples)
+        return samples
 
     def bernstein_poly(self, i, n, t):
         """
@@ -244,6 +274,46 @@ class BSplineControl(ActionOperation):
         presistentInfo['phi_init'] = self.start_angle
         return presistentInfo
 
+    def draw_persistent(self, ax, df, sim_time):
+
+        # collect the path at the current time
+        slice = df[df['sim_time'] <= sim_time]
+        slice_len = len(slice)-1
+
+        if len(slice) != 0:
+
+            # get path starting locations
+            x_pos = slice['persistent_info_x_init'].iloc[slice_len]
+            y_pos = slice['persistent_info_y_init'].iloc[slice_len]
+            phi = slice['persistent_info_phi_init'].iloc[slice_len]
+
+            self.start_location = np.reshape([x_pos,y_pos],(2,))
+            self.start_angle = phi
+
+            path_cols = slice[[col for col in df.columns if "mutated_action" in col]]
+            col_names = list(path_cols.columns)
+            path_dict = dict()
+            for col in col_names:
+                part_col = col.split('_')
+                point_num = int(part_col[len(part_col) - 1])
+
+                path_dict[point_num] = path_cols[col].iloc[slice_len]
+
+            angle_df = pd.DataFrame(path_dict.items(), columns=['angle', 'val'])
+            angle_df.sort_values(by=['angle'], inplace=True)
+            path_angles = angle_df['val'].to_numpy()
+
+            # un-normalize angles
+            for i, action in enumerate(path_angles):
+                path_angles[i] = (action - self.output_range[0]) * (
+                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+
+            samples = self.build_spline_from_angles(path_angles)
+
+            ax.plot(samples[:,0], samples[:,1], 'o--', color='gray')
+
+
 
 class DubinsControl(ActionOperation):
 
@@ -270,6 +340,12 @@ class DubinsControl(ActionOperation):
         # save information for refreshing.
         self.start_location = []
         self.start_angle = None
+
+    def init_state_action(self, entities, sensors):
+        pass
+
+    def prep_state_action(self, entities, sensors, sim_time):
+        pass
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
@@ -605,7 +681,7 @@ class DubinsControl(ActionOperation):
 
 class RLProbablisticRoadMap(ActionOperation):
 
-    def __init__(self, action_options_dict, controller, frequency, is_continuous, max_edge_dst, name, number_controls, n_samples,output_range, target_entity, model_path='', model_radius=None):
+    def __init__(self, action_options_dict, controller, domain, frequency, graph_frequency, is_continuous, max_connect_dst, name, number_controls, n_samples,output_range, target_entity, target_sensor, trans_dst, use_simple_model, model_path='', model_radius=None):
         """
         Action operation that a probabilistic road map to help navigate to the goal. The connections in the graph are
         either built with a simple circle radius model or using a neural network based transition model.
@@ -619,19 +695,115 @@ class RLProbablisticRoadMap(ActionOperation):
         """
         super(RLProbablisticRoadMap, self).__init__(action_options_dict, controller, frequency, is_continuous, name, number_controls)
 
-        self.n_samples = n_samples  # number of points along the bspline path used for navigating
+        self.domain = domain
+        self.n_samples = n_samples  # number of points in the PRM
         self.target_entity = target_entity
+        self.target_sensor = target_sensor
 
         # save information for what transition model to use
-        self.max_edge_dst = max_edge_dst
         self.model_path = model_path
         self.model_radius = model_radius
         self.use_simple_model = True if model_radius is not None else False
+        self.last_reset_time = 0.0  # [s]
+        self.graph_frequency = graph_frequency
 
         # save information for refreshing.
         self.vertices = [] # list of the vertices in the graph
+        self.max_connect_dst = max_connect_dst
+        self.model_radius = model_radius
+        self.n_samples = n_samples
+        self.trans_dst = trans_dst #distance to subgoal to acheive before moving to the next subgoal
+        self.use_simple_model = use_simple_model
+        self.path = None  # path that leads to the goal location
 
+    def init_state_action(self, entities, sensors):
 
+        goal_loc = [entities['destination'].state_dict['x_pos'], entities['destination'].state_dict['y_pos']]
+
+        start_loc = [entities[self.target_entity].state_dict['x_pos'], entities[self.target_entity].state_dict['y_pos']]
+        state = {'phi': entities[self.target_entity].state_dict['phi']}
+
+        # build a graph
+        raw_path = self.build_prm(goal_loc, start_loc, state)
+
+        self.path = self.format_path(raw_path)
+        self.sub_goal_idx = 1
+        sub_goal = self.path[self.sub_goal_idx,:]
+
+        dst = np.sqrt( (start_loc[0]-sub_goal[0])**2 + (start_loc[1]-sub_goal[1])**2)
+        target_unit_vec = [np.cos(entities[self.target_entity].state_dict['phi']), np.sin(entities[self.target_entity].state_dict['phi'])]
+        goal_vec = [sub_goal[0]-start_loc[0],sub_goal[1]-start_loc[1]]
+        mu = get_angle_between_vectors(target_unit_vec,goal_vec,True)
+        if mu < 0:
+            mu += 2.0*np.pi
+        elif mu > 2.0*np.pi:
+            mu -= 2.0 * np.pi
+
+        # update the sub_goal sensor to point to the nearest point
+        sensors[self.target_sensor].state_dict['angle'] = mu
+        sensors[self.target_sensor].state_dict['distance'] = dst
+
+    def prep_state_action(self, entities, sensors, sim_time):
+
+        # reset last regraph time. Quick hack.
+        if sim_time <= 1e-12:
+            self.last_reset_time = -np.infty
+
+        if sim_time - self.last_reset_time >= self.graph_frequency:
+
+            self.last_reset_time = sim_time
+
+            goal_loc = [entities['destination'].state_dict['x_pos'], entities['destination'].state_dict['y_pos']]
+
+            start_loc = [entities[self.target_entity].state_dict['x_pos'],
+                         entities[self.target_entity].state_dict['y_pos']]
+            state = {'phi': entities[self.target_entity].state_dict['phi']}
+
+            # build a graph
+            raw_path = self.build_prm(goal_loc, start_loc, state)
+
+            # change path to be (x,y,theta)
+            self.path = self.format_path(raw_path)
+
+            # set current sub goal
+            self.sub_goal_idx = 1
+
+        # update sub destination sensor to point to the nearest point in the path
+        curr_loc = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos']]
+        tmp_dst = np.sqrt((curr_loc[0] - self.path[self.sub_goal_idx,0]) ** 2 + (curr_loc[1] - self.path[self.sub_goal_idx,1]) ** 2)
+        if (tmp_dst <= self.trans_dst):
+            self.sub_goal_idx += 1
+
+        if self.sub_goal_idx >= len(self.path)-2:
+            self.sub_goal_idx = len(self.path)-1 # correct for walking off the end of the array
+            sub_goal = self.path[len(self.path)-1, :2]
+        else:
+            sub_goal = self.path[self.sub_goal_idx+1,:2]
+
+        dst = np.sqrt((curr_loc[0] - sub_goal[0]) ** 2 + (curr_loc[1] - sub_goal[1]) ** 2)
+        target_unit_vec = [np.cos(entities[self.target_entity].state_dict['phi']),
+                           np.sin(entities[self.target_entity].state_dict['phi'])]
+        goal_vec = [sub_goal[0] - curr_loc[0], sub_goal[1] - curr_loc[1]]
+        mu = get_angle_between_vectors(target_unit_vec, goal_vec, True)
+        if mu < 0:
+            mu += 2.0 * np.pi
+        elif mu > 2.0 * np.pi:
+            mu -= 2.0 * np.pi
+
+        # update the sub_goal sensor to point to the nearest point
+        sensors[self.target_sensor].state_dict['angle'] = mu
+        sensors[self.target_sensor].state_dict['distance'] = dst
+
+    def format_path(self, path):
+
+        # change path to be (x,y,theta)
+        samples = np.zeros((len(path), 3))
+        for i, vert in enumerate(reversed(path)):
+            samples[i, 0] = vert.location[0]
+            samples[i, 1] = vert.location[1]
+            samples[i, 2] = vert.state['phi']
+
+        return samples
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
@@ -650,79 +822,32 @@ class RLProbablisticRoadMap(ActionOperation):
             with.
         """
 
-        # build a graph
-        path = self.build_prm()
-
-        '''
         if self.is_continuous:
-            # TODO Don't know if this block is needed. May need scaling.
-            path_angles = copy.deepcopy(action_vector)
+            transformed_action = np.zeros_like(action_vector)
             for i, action in enumerate(action_vector):
-                path_angles[i] = (action - self.output_range[0]) * (
-                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
-                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
-
+                transformed_action[i] = (action - self.output_range[0]) * (
+                            self.action_bounds[0][1] - self.action_bounds[0][0]) / (
+                                                    self.output_range[1] - self.output_range[0]) + \
+                                        self.action_bounds[0][0]
         else:
-            # discrete
-            path_angles = self.action_options[action_vector]
+            # convert index to case
+            transformed_action = self.action_options[action_vector][0]
 
-        # build the b spline curve. from the called out angles
-        control_points = np.zeros((len(path_angles)+1,2))
-        control_points[0,:] = np.array(self.start_location)
-        cp_angle = np.zeros(len(path_angles))
-        cp_angle[0] = self.start_angle + path_angles[0]
-        for i in range(len(path_angles)):
-            control_points[i+1,0] = control_points[i,0]+self.segment_length*np.cos(cp_angle[i])
-            control_points[i+1, 1] = control_points[i, 1] + self.segment_length * np.sin(cp_angle[i])
-            if i < len(path_angles)-1:
-                cp_angle[i+1] = cp_angle[i] + path_angles[i+1]
+        return transformed_action
 
-        samples = self.bezier_curve( control_points, self.n_samples)
-
-        # get the point that is nearest to the agent, then advance one
-        idx = 0
-        min_dst = np.infty
-
-        # get the current position of the entity
-        entity_x = entities[self.target_entity].state_dict['x_pos']
-        entity_y = entities[self.target_entity].state_dict['y_pos']
-        for i, samp in enumerate(samples):
-            tmp_dst = np.sqrt( (samp[0]-entity_x)**2 + (samp[1]-entity_y)**2)
-            if tmp_dst < min_dst:
-                min_dst = tmp_dst
-                idx = i
-        # increment the index by 1 if possible.
-        if idx < len(samples)-1:
-            idx += 1
-            
-        '''
-
-        # use the controller to produce a change to the agent
-        heading = entities[self.target_entity].state_dict['phi']
-
-        rot_mat = [[np.cos(heading), np.sin(heading), 0.0],
-                   [-np.sin(heading), np.cos(heading), 0.0],
-                   [0.0, 0.0, 1.0]]
-        rot_mat = np.reshape(rot_mat, (3, 3))
-
-        diff = np.subtract([samples[idx,0],samples[idx,1],samples[idx,2]], [entity_x,entity_y,heading])
-
-        error_vec = np.matmul(rot_mat, diff)
-
-        v_mag = np.sqrt(entities[self.target_entity].state_dict['v_mag'])
-        command = self.controller.get_command(delta_t,error_vec,v_mag)
-
-        # return the transfromed action
-        return command
-
-    def build_prm(self):
-
+    def build_prm(self, goal_loc, start_loc, state):
         # build the verticies of the PRM
         self.vertices = []
-        self.vertices.append(VertexPRM(start_loc,state=state))
+        self.vertices.append(VertexPRM(start_loc, state=state))
         for i in range(self.n_samples):
-            # TODO need domain for low and high values
-            location = np.random.uniform(low=domain[0], high=domain[1], size=(2,))
+
+            # TODO need to check if the point is in an obstacle.
+
+            # draw random point
+            location = np.zeros((2,))
+            location[0] = np.random.uniform(low=self.domain['min_x'], high=self.domain['max_x'])
+            location[1] = np.random.uniform(low=self.domain['min_y'], high=self.domain['max_y'])
+
             self.vertices.append(VertexPRM(location))
 
         self.vertices.append(VertexPRM(goal_loc))
@@ -739,18 +864,16 @@ class RLProbablisticRoadMap(ActionOperation):
                     curr_state = current_vert.state
 
                     dst = np.sqrt((current_vert.location[0] - tmp_vert.location[0]) ** 2 + (
-                                current_vert.location[1] - tmp_vert.location[1]) ** 2)
-                    dst_to_org = 0.0  # distance from current location to current_vert
-
+                            current_vert.location[1] - tmp_vert.location[1]) ** 2)
 
                     if self.use_simple_model:
                         # use a simple arc model for determining if the node is reachable
 
                         # get angle from current heading to tmp vertex
-                        delta_x = tmp_vert.location[0]- current_vert.location[0]
+                        delta_x = tmp_vert.location[0] - current_vert.location[0]
                         delta_y = tmp_vert.location[1] - current_vert.location[1]
                         theta = np.arctan2(delta_y, delta_x)
-                        mu1 = theta - curr_state['psi']
+                        mu1 = theta - curr_state['phi']
                         if mu1 >= 0:
                             mu2 = np.pi * 2.0 - mu1  # explementary angle
                         else:
@@ -759,23 +882,121 @@ class RLProbablisticRoadMap(ActionOperation):
                         ind = np.argmin(np.abs(mu_v))
                         mu = mu_v[ind]
 
-                        if np.abs(mu) > np.pi/2.0:
-                            gamma = mu-np.pi/2.0
+                        if np.abs(mu) > np.pi / 2.0:
+                            gamma = np.abs(mu) - np.pi / 2.0
                         else:
-                            gamma = np.pi/2.0
+                            gamma = np.pi / 2.0 - np.abs(mu)
 
-                        arc_radius = dst*np.sin(gamma)/np.sin(np.pi-2.0*gamma)
+                        arc_radius = dst * np.sin(gamma) / np.sin(np.pi - 2.0 * gamma)
 
-                        if arc_radius >= self.model_radius:
+                        # plot the  circle connecting everything
+                        if mu < 0:
+                            angle_off = -np.pi / 2.0
+
+                        else:
+                            angle_off = np.pi / 2.0
+                        radius_vec = [arc_radius * np.cos(state['phi']), arc_radius * np.sin(state['phi'])]
+                        radius_offset = [radius_vec[0] * np.cos(angle_off) - radius_vec[1] * np.sin(angle_off),
+                                         radius_vec[0] * np.sin(angle_off) + radius_vec[1] * np.cos(angle_off)]
+                        radius_point = [current_vert.location[0] + radius_offset[0],
+                                        current_vert.location[1] + radius_offset[1]]
+
+                        vec1 = [current_vert.location[0] - radius_point[0], current_vert.location[1] - radius_point[1]]
+                        vec2 = [tmp_vert.location[0] - radius_point[0], tmp_vert.location[1] - radius_point[1]]
+                        delta1 = get_angle_between_vectors(vec1, vec2, True)
+                        unit_vec = [np.cos(state['phi']), np.sin(state['phi'])]
+                        delta2 = get_angle_between_vectors(vec1, unit_vec, True)
+                        circumfrance = 2.0 * np.pi * arc_radius
+                        if (delta1 > 0 and delta2 < 0) or (delta1 < 0 and delta2 > 0):
+                            # long way around
+                            arc_length = max([circumfrance - np.abs(delta1) * arc_radius, np.abs(delta1) * arc_radius])
+                        else:
+                            # short way around
+                            arc_length = min([circumfrance - np.abs(delta1) * arc_radius, np.abs(delta1) * arc_radius])
+
+                        # get end angle
+                        swept_angle = arc_length / arc_radius  # angle to rotate initial psi to to get ending angle
+                        end_vec = [unit_vec[0] * np.cos(swept_angle) - unit_vec[1] * np.sin(swept_angle),
+                                   unit_vec[0] * np.sin(swept_angle) + unit_vec[1] * np.cos(swept_angle)]
+                        end_angle = np.arctan2(end_vec[1], end_vec[0])
+
+                        if arc_radius >= self.model_radius and dst <= self.max_connect_dst and arc_length <= 2.0 * self.max_connect_dst:
                             # can reach the point. Make the connection and add the node to the open set.
 
                             if tmp_vert not in current_vert.children and current_vert not in tmp_vert.children:
+                                tmp_vert.state = {'phi': end_angle}
+                                tmp_vert.dst_to_par = arc_length
                                 current_vert.children.append(tmp_vert)
                                 open_verts.append(tmp_vert)
                     else:
                         # TODO
                         # use a surrogate model for determining if the next node is reachable
                         pass
+
+        # extract path from graph with astar
+        path, count = self.astar(self.vertices[0], self.vertices[len(self.vertices) - 1], len(self.vertices))
+
+        # set current waypoint to goal if no path exists.
+        if path == [] or count >= len(self.vertices):
+            path = []
+            # I don't think the stat values matter here
+            path.append(VertexPRM(goal_loc, state=state))
+            path.append(VertexPRM(start_loc, state={'phi':0.0}))
+
+
+        return path
+
+    def astar(self, start, goal, n_verts):
+
+        open_lst = [start]
+        closed_lst = []
+        is_complete = False
+        count = 0
+        while len(open_lst) > 0 and not is_complete: #and count < n_verts + 1:
+            count += 1
+            min_f = np.infty
+            min_idx = None
+            for i, node in enumerate(open_lst):
+                if node.f < min_f:
+                    min_idx = i
+                    min_f = node.f
+            q = open_lst.pop(min_idx)
+
+            for child in q.children:
+
+                if child == goal:
+                    child.parent = q
+                    is_complete = True
+                    break
+
+                if child not in open_lst and child not in closed_lst:
+                    child.h = np.sqrt(
+                        (child.location[0] - goal.location[0]) ** 2 + (
+                                child.location[1] - goal.location[1]) ** 2)
+                    # child.h = dst_to_goal
+                    child.g = q.g + child.dst_to_par  # distance to reach parent node
+                    child.f = child.h + child.g
+
+                    child.parent = q
+                    open_lst.append(child)
+
+            closed_lst.append(q)
+
+        # build the path
+        path = []
+        current_node = goal
+        if goal.parent is not None:
+            path_count = 0
+            while current_node.parent is not None and path_count < n_verts + 1:
+                path_count += 1
+                path.append(current_node)
+                current_node = current_node.parent
+            # if len(path) == 0:
+
+            # add the start node to the path
+            path.append(start)
+
+        return path, count
 
     def setPersistentInfo(self,entities,sensors):
         """
@@ -787,21 +1008,45 @@ class RLProbablisticRoadMap(ActionOperation):
         :param sensors: An ordered dictionary containing the sensors in a simulation.
         :return:
         """
-
-        '''
-        # save the root of the bsline to build the spline from
-        self.start_location = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos']]
-        self.start_angle = entities[self.target_entity].state_dict['phi']
-
         presistentInfo = OrderedDict()
-        presistentInfo['x_init'] = self.start_location[0]
-        presistentInfo['y_init'] = self.start_location[1]
-        presistentInfo['phi_init'] = self.start_angle
-        '''
-
-        #save the build graph for later use
+        k = 0
+        for i, vert in enumerate(self.path):
+            presistentInfo['path_x_'+str(k)] = vert[0]
+            presistentInfo['path_y_' + str(k)] = vert[1]
+            k += 1
 
         return presistentInfo
+
+    def draw_persistent(self, ax, df, sim_time):
+
+        # collect the path at the current time
+        slice = df[df['sim_time'] == sim_time]
+
+        if len(slice) != 0:
+
+            # reorganize into the correct order
+            path_cols = slice[[col for col in df.columns if "persistent_info_path" in col]]
+            col_names = list(path_cols.columns)
+            x_dict = dict()
+            y_dict = dict()
+            for col in col_names:
+                if not np.isnan(path_cols[col].iloc[0]):
+
+                    part_col = col.split('_')
+                    point_num = int(part_col[len(part_col)-1])
+                    point_dim = str(part_col[len(part_col)-2])
+
+                    if point_dim == 'x':
+                        x_dict[point_num] = path_cols[col].iloc[0]
+                    elif point_dim == 'y':
+                        y_dict[point_num] = path_cols[col].iloc[0]
+
+            x_df = pd.DataFrame(x_dict.items(),columns=['x','val'])
+            x_df.sort_values(by=['x'], inplace=True)
+            y_df = pd.DataFrame(y_dict.items(),columns=['y','val'])
+            y_df.sort_values(by=['y'], inplace=True)
+            # plot
+            ax.plot(x_df['val'], y_df['val'],'o--',color='gray')
 
 class VertexPRM():
 
@@ -810,6 +1055,7 @@ class VertexPRM():
         self.parent = None
         self.location = location
         self.state = state
+        self.dst_to_par = None
         self.g = 0
         self.h = 0
         self.f = 0

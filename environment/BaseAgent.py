@@ -44,6 +44,14 @@ class BaseAgent(ABC):
         for name, value in self.learning_algorithms.items():
             value.reset()
 
+    def init_state_action(self, entities, sensors):
+        for name, value in self.learning_algorithms.items():
+            value.init_state_action(self.action_operation, entities, sensors)
+
+    def prep_state_action( self, entities, sensors, sim_time):
+        for name, value in self.learning_algorithms.items():
+            value.prep_state_action(self.action_operation,entities,sensors, sim_time)
+
     def create_state_action(self, entities, episode_num, sensors, sim_time, use_exploration):
         for name, value in self.learning_algorithms.items():
             value.create_state_action(self.action_operation,entities, episode_num, sensors, sim_time, use_exploration)

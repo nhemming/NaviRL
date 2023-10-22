@@ -57,6 +57,13 @@ class DDPG(BaseLearningAlgorithm):
         self.last_target_update = -np.infty
         self.loss_header = "Episode_number,actor_loss,critic_loss\n"
 
+    def init_state_action(self,action_operation,entities,sensors):
+        # call the action operation preperation step.
+        action_operation.init_state_action(entities,sensors)
+
+    def prep_state_action(self,action_operation,entities,sensors,sim_time ):
+        action_operation.prep_state_action(entities,sensors,sim_time )
+
     def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
         """
         parses the current state of the simulation to build the state required for the agent.
