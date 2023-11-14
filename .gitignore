@@ -20,3 +20,6 @@ design_documents/
 
 # ignore external nn_builder
 nn_builder/
+
+# ignore profiler data
+*.prof

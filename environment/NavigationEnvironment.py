@@ -59,6 +59,9 @@ class NavigationEnvironment:
         # TODO should be loaded from file not hard coded
         self.reset_seperation_dst = 2
 
+        # save a dictionary of pandas data frames holding the initial conditions of the entities in the simulation
+        self.init_conditions_dict = dict()
+
     def build_env_from_yaml(self, file_name, base_dir, create=True):
         """
         Given a yaml file that has configuration details for the environment and hyperparameters for the agents,
@@ -130,6 +133,86 @@ class NavigationEnvironment:
             # save the hyper parameter set
             with open(os.path.join(output_dir,'hyper_parameters.yaml'), 'w') as file:
                 yaml.safe_dump(self.h_params, file)
+
+    def build_eval_env_from_yaml(self, eval_file_name, base_dir):
+
+        with open(eval_file_name, "r") as stream:
+            try:
+                eval_data = yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                print(exc)
+
+        # open eval data to get file name of experiment
+        exp_data = eval_data['BaseExperiment']
+        base_items = base_dir.split("\\")
+        substr = base_items.pop()
+        exp_file_name = base_dir.replace(substr,'')
+        folders_to_add = [exp_data['base_folder'],'output',exp_data['set_name'],str(exp_data['trial_num']), 'hyper_parameters.yaml']
+        for folder in folders_to_add:
+            exp_file_name = os.path.join(exp_file_name,folder)
+
+        self.build_env_from_yaml( exp_file_name, base_dir, create=False)
+
+        # create tables for non-default initial conditions
+        entities = eval_data['Entities']
+
+        # load and save the initial conditions that are non-defaulted for the evaluation set.
+        for name, ent in entities.items():
+            tmpDf = pd.DataFrame()
+            for col_name, col in ent.items():
+                tmpDf[col_name] = col.split(',')
+            if tmpDf.isnull().values.any():
+                raise ValueError('One or more of the inputs does not have the correct amount of initial conditions specified')
+            self.init_conditions_dict[name] = tmpDf
+
+        # check each df has the same length.
+        lens = []
+        for name, df in self.init_conditions_dict.items():
+            lens.append(len(df))
+        if not all(x == lens[0] for x in lens):
+            raise ValueError('The entities do not have the same amount of initial conditions')
+
+        # save the number of instances in the evaluation set
+        self.eval_set_size = lens[0]
+
+        # scan models for what frequency to load models at
+        file_path = exp_file_name.replace('\\hyper_parameters.yaml','')
+        self.output_dir = file_path
+        self.model_path = os.path.join(file_path,'models')
+        files = os.listdir(self.model_path)
+        files = [f for f in files if os.path.isfile(self.model_path + '/' + f)]
+
+        self.model_nums = []
+        for f in files:
+            tmp_file = f.split('-')[1]
+            tmp_file = tmp_file.replace('Actor','')
+            tmp_file = tmp_file.replace('Critic', '')
+            tmp_file = tmp_file.replace('.mdl','')
+            model_num = int(tmp_file)
+            if model_num not in self.model_nums:
+                self.model_nums.append(model_num)
+
+        # save the model numbers to be run.
+        self.model_nums.sort()
+
+        # save the maximum simulation time for the evaluation episode
+        self.max_eval_time = eval_data['MetaData']['max_eval_time']
+
+        self.eval_trial_num = eval_data['MetaData']['eval_trial_num']
+        try:
+            file_path = os.path.join(file_path,'evaluation')
+            file_path = os.path.join(file_path, str(self.eval_trial_num))
+            os.mkdir(file_path)
+        except:
+            pass
+        # add sub folders for evaluation set.
+        folders_to_add = ['entities','sensors','graphs','videos','learning_algorithm']
+        for fta in folders_to_add:
+            try:
+                folder_path = os.path.join(file_path, fta)
+                os.mkdir(folder_path)
+            except:
+                pass
 
     def load_entities(self):
         """
@@ -422,8 +505,6 @@ class NavigationEnvironment:
 
             print("Episode Number={}".format(episode_num))
 
-            # run evaluation set
-
             # run training simulation
             history_path = os.path.join(self.output_dir,'training')
             self.run_simulation(episode_num, history_path, self.max_training_time, True)
@@ -433,14 +514,17 @@ class NavigationEnvironment:
                 # train the agent
                 value.train(episode_num,self.output_dir)
 
-    def run_simulation(self, episode_num, history_path, max_time, use_exploration=True):
+    def run_simulation(self, episode_num, history_path, max_time, use_exploration=True, is_training=True, eval_ic_num=None):
 
         sim_time = 0.0
         done = False # false if the simulation is still active
 
         # call the reset methods for everything
         # reset the simulation
-        self.reset()
+        if is_training:
+            self.reset()
+        else:
+            self.reset_eval(eval_ic_num)
 
         # reset the agents
         for name, tmp_agent in self.agents.items():
@@ -544,16 +628,25 @@ class NavigationEnvironment:
 
         # write entity history
         for name, tmp_entity in self.entities.items():
-            tmp_entity.write_history(episode_num,history_path)
+            if is_training:
+                tmp_entity.write_history(episode_num,history_path)
+            else:
+                tmp_entity.write_history(episode_num, history_path, '-evalnum'+str(eval_ic_num))
 
         # write learning alg history
         for name, tmp_agent in self.agents.items():
             for tmp_name, tmp_lrn_agent in tmp_agent.learning_algorithms.items():
-                tmp_lrn_agent.write_history(name,episode_num,history_path)
+                if is_training:
+                    tmp_lrn_agent.write_history(name,episode_num,history_path)
+                else:
+                    tmp_lrn_agent.write_history(name, episode_num, history_path, '-evalnum'+str(eval_ic_num))
 
         # write sensor history
         for name, tmp_sensor in self.sensors.items():
-            tmp_sensor.write_history(episode_num,history_path)
+            if is_training:
+                tmp_sensor.write_history(episode_num,history_path)
+            else:
+                tmp_sensor.write_history(episode_num, history_path,'-evalnum'+str(eval_ic_num))
 
     def reset(self):
         # reset the environment. Sensors do not have positions
@@ -574,6 +667,7 @@ class NavigationEnvironment:
                     if tmp_dst < min_dst:
                         min_dst = tmp_dst
 
+
             value.state_dict['x_pos'] = new_x
             value.state_dict['y_pos'] = new_y
 
@@ -582,6 +676,22 @@ class NavigationEnvironment:
 
             # each entity should have its own reset function
             value.reset()
+
+    def reset_eval(self, eval_ic_num):
+        # reset the environment. Sensors do not have positions
+
+        new_loc_lst = []
+        for name, value in self.entities.items():
+
+            # each entity should have its own reset function
+            value.reset()
+
+            eval_ic = self.init_conditions_dict[value.name].iloc[eval_ic_num]
+
+            for tmp_name, tmp_value in eval_ic.items():
+
+                value.state_dict[tmp_name] = float(tmp_value)
+
 
     def set_collision_status(self):
         """
@@ -594,3 +704,36 @@ class NavigationEnvironment:
             for j in range(i+1,len(entity_names)):
                 is_collided = get_collision_status(self.entities[entity_1_name],self.entities[entity_names[j]])
                 self.entities[entity_1_name].state_dict['is_collided'] = is_collided or self.entities[entity_1_name].state_dict['is_collided']
+
+    def run_evaluation_set(self):
+
+        # loop over model numbers
+        for model_num in self.model_nums:
+
+            # load the neural networks into the agent
+            for tmp_agent_name, tmp_agent in self.agents.items():
+                for tmp_lrn_alg_name, tmp_lrn_alg in tmp_agent.learning_algorithms.items():
+                    tmp_lrn_alg.load_networks(self.model_path,model_num)
+
+            # loop over initial conditions
+            #for ic in self.init_conditions_dict:
+            for i in range(self.eval_set_size):
+
+                print("Episode Number:{:.0f}\tI.C. Number:{:.0f}".format(model_num,i))
+
+                # set current initial conditions maybe here.
+
+                # run simulation
+                history_path = os.path.join(self.output_dir, 'evaluation') # TODO figure out what to do
+                history_path = os.path.join(history_path, str(self.eval_trial_num))
+                self.run_simulation(model_num, history_path, self.max_eval_time, use_exploration=True, is_training=False, eval_ic_num=i)
+
+        '''
+        max_num_episodes = self.h_params['MetaData']['num_episodes']
+        for episode_num in range(max_num_episodes):
+            print("Episode Number={}".format(episode_num))
+
+            # run training simulation
+            history_path = os.path.join(self.output_dir, 'training')
+            self.run_simulation(episode_num, history_path, self.max_training_time, True)
+        '''

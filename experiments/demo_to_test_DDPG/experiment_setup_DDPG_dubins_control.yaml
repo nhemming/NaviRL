@@ -142,7 +142,7 @@ MetaData:
   seed: 0
   set: DebugDDPGDubins
   training_sim_time: 100.0
-  trial_num: 1
+  trial_num: 2
 
 RewardDefinition:
   component0:

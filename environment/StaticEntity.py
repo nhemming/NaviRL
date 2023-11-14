@@ -25,6 +25,10 @@ class StaticEntity(Entity):
         # do nothing
         pass
 
+    def reset_random(self):
+        # do nothing
+        pass
+
     def draw_trajectory(self, ax, data, sim_time):
         # draw trajectory
         ax.plot(data['x_pos'], data['y_pos'])

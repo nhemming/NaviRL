@@ -140,7 +140,7 @@ MetaData:
   seed: 0
   set: DebugDDPGBSpline
   training_sim_time: 100.0
-  trial_num: 4
+  trial_num: 6
 
 RewardDefinition:
   component0:

@@ -106,7 +106,7 @@ class DDPG(BaseLearningAlgorithm):
             self.action_info = {'raw_action':raw_action, 'mutated_action': mutated_action, 'q_values': critic_values}
 
             # save information that it is persistent for the action operation until the next time an action is selected.
-            self.action_info['persistent_info'] = action_operation.setPersistentInfo(entities, sensors)
+            self.action_info['persistent_info'] = action_operation.setPersistentInfo(entities, sensors, mutated_action)
 
     def train(self, ep_num,file_path):
 
@@ -176,6 +176,16 @@ class DDPG(BaseLearningAlgorithm):
 
             # save tuple to history
             self.add_sample_history(reward, done, sim_time)
+
+    def load_networks(self, model_path, model_num):
+
+        critic_file = os.path.join(model_path,self.name+'_epnum-Critic'+str(model_num)+'.mdl')
+        self.critic_network.load_state_dict(torch.load(critic_file))
+        self.critic_network.eval()
+
+        actor_file = os.path.join(model_path, self.name + '_epnum-Actor' + str(model_num) + '.mdl')
+        self.actor_network.load_state_dict(torch.load(actor_file))
+        self.actor_network.eval()
 
     def forward_actor(self,state):
         with torch.no_grad():

@@ -213,12 +213,12 @@ class Entity:
     def reset_history(self):
        self.history = []
 
-    def write_history(self, episode_number, file_path):
+    def write_history(self, episode_number, file_path, eval_num=''):
         # TODO change from csv to sqlite data base
         # write history to csv
         df = pd.DataFrame(self.history)
         file_path = os.path.join(file_path, 'entities')
-        df.to_csv(os.path.abspath(os.path.join(file_path,str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
+        df.to_csv(os.path.abspath(os.path.join(file_path,str(self.name)+'_epnum-'+str(episode_number)+eval_num+'.csv')), index=False)
 
     def reset_base(self):
         self.reset()

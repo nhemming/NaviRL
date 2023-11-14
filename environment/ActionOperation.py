@@ -109,6 +109,7 @@ class BSplineControl(ActionOperation):
         # save information for refreshing.
         self.start_location = []
         self.start_angle = None
+        self.samples = []
 
     def init_state_action(self, entities, sensors):
         pass
@@ -132,34 +133,6 @@ class BSplineControl(ActionOperation):
         :return: The command that is in the dimensions that are appropriate for the entity to update its control scheme
             with.
         """
-
-        if self.is_continuous:
-            path_angles = copy.deepcopy(action_vector)
-            for i, action in enumerate(action_vector):
-                path_angles[i] = (action - self.output_range[0]) * (
-                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
-                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
-
-        else:
-            # discrete
-            path_angles = self.action_options[action_vector]
-
-        # build the b spline curve. from the called out angles
-        '''
-        control_points = np.zeros((len(path_angles)+1,2))
-        control_points[0,:] = np.array(self.start_location)
-        cp_angle = np.zeros(len(path_angles))
-        cp_angle[0] = self.start_angle + path_angles[0]
-        for i in range(len(path_angles)):
-            control_points[i+1,0] = control_points[i,0]+self.segment_length*np.cos(cp_angle[i])
-            control_points[i+1, 1] = control_points[i, 1] + self.segment_length * np.sin(cp_angle[i])
-            if i < len(path_angles)-1:
-                cp_angle[i+1] = cp_angle[i] + path_angles[i+1]
-
-        samples = self.bezier_curve( control_points, self.n_samples)
-        '''
-        samples = self.build_spline_from_angles(path_angles)
-
         # get the point that is nearest to the agent, then advance one
         idx = 0
         min_dst = np.infty
@@ -167,13 +140,13 @@ class BSplineControl(ActionOperation):
         # get the current position of the entity
         entity_x = entities[self.target_entity].state_dict['x_pos']
         entity_y = entities[self.target_entity].state_dict['y_pos']
-        for i, samp in enumerate(samples):
+        for i, samp in enumerate(self.samples):
             tmp_dst = np.sqrt( (samp[0]-entity_x)**2 + (samp[1]-entity_y)**2)
             if tmp_dst < min_dst:
                 min_dst = tmp_dst
                 idx = i
         # increment the index by 1 if possible.
-        if idx < len(samples)-1:
+        if idx < len(self.samples)-1:
             idx += 1
 
         # use the controller to produce a change to the agent
@@ -184,7 +157,7 @@ class BSplineControl(ActionOperation):
                    [0.0, 0.0, 1.0]]
         rot_mat = np.reshape(rot_mat, (3, 3))
 
-        diff = np.subtract([samples[idx,0],samples[idx,1],samples[idx,2]], [entity_x,entity_y,heading])
+        diff = np.subtract([self.samples[idx,0],self.samples[idx,1],self.samples[idx,2]], [entity_x,entity_y,heading])
 
         error_vec = np.matmul(rot_mat, diff)
 
@@ -253,7 +226,7 @@ class BSplineControl(ActionOperation):
         # samples columns = x, y, theta, ?
         return samples
 
-    def setPersistentInfo(self,entities,sensors):
+    def setPersistentInfo(self,entities,sensors, action_vector):
         """
         Save information about the action chosen at the simulation step it is chosen. This enables only storing copies
         of the needed information needed to reconstruct the action. For the bspline, the angles and starting conditions
@@ -267,6 +240,20 @@ class BSplineControl(ActionOperation):
         # save the root of the bsline to build the spline from
         self.start_location = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos']]
         self.start_angle = entities[self.target_entity].state_dict['phi']
+
+        if self.is_continuous:
+            path_angles = copy.deepcopy(action_vector)
+            for i, action in enumerate(action_vector):
+                path_angles[i] = (action - self.output_range[0]) * (
+                            self.action_bounds[i][1] - self.action_bounds[i][0]) / (
+                                               self.output_range[1] - self.output_range[0]) + self.action_bounds[i][0]
+
+        else:
+            # discrete
+            path_angles = self.action_options[action_vector]
+
+        # build the b spline curve. from the called out angles
+        self.samples = self.build_spline_from_angles(path_angles)
 
         presistentInfo = OrderedDict()
         presistentInfo['x_init'] = self.start_location[0]
@@ -343,6 +330,7 @@ class DubinsControl(ActionOperation):
         # save information for refreshing.
         self.start_location = []
         self.start_angle = None
+        self.samples = []
 
     def init_state_action(self, entities, sensors):
         pass
@@ -366,31 +354,6 @@ class DubinsControl(ActionOperation):
         :return: The command that is in the dimensions that are appropriate for the entity to update its control scheme
             with.
         """
-
-        if self.is_continuous:
-            path_description = copy.deepcopy(action_vector)
-            for i, action in enumerate(action_vector):
-                path_description[i] = (action - self.output_range[0]) * (self.action_bounds[i][1]-self.action_bounds[i][0]) / (self.output_range[1]-self.output_range[0]) + self.action_bounds[i][0]
-        else:
-            # discrete
-            path_description = self.action_options[action_vector]
-
-        # build the dubins path and get eht samples
-        #start = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos'],entities[self.target_entity].state_dict['phi']]
-        #end_theta = entities[self.target_entity].state_dict['phi']+path_description[0]+path_description[2]
-        start = [self.start_location[0], self.start_location[1],
-                 self.start_angle]
-        end_theta = self.start_angle + path_description[0] + path_description[2]
-        if end_theta > np.pi*2.0:
-            end_theta -= np.pi*2.0
-        elif end_theta < 0.0:
-            end_theta += np.pi*2.0
-        end = [self.start_location[0] + path_description[1]*np.cos(self.start_angle + path_description[0]),
-               self.start_location[1] + path_description[1]*np.sin(self.start_angle + path_description[0]),
-               end_theta]
-        radius = path_description[3]
-        samples = self.build_shortest_dubins( start, end, radius, radius)
-
         # get the point that is nearest to the agent, then advance one
         idx = 0
         min_dst = np.infty
@@ -398,13 +361,13 @@ class DubinsControl(ActionOperation):
         # get the current position of the entity
         entity_x = entities[self.target_entity].state_dict['x_pos']
         entity_y = entities[self.target_entity].state_dict['y_pos']
-        for i, samp in enumerate(samples):
+        for i, samp in enumerate(self.samples):
             tmp_dst = np.sqrt( (samp[0]-entity_x)**2 + (samp[1]-entity_y)**2)
             if tmp_dst < min_dst:
                 min_dst = tmp_dst
                 idx = i
         # increment the index by 1 if possible.
-        if idx < len(samples)-1:
+        if idx < len(self.samples)-1:
             idx += 1
 
         # use the controller to produce a change to the agent
@@ -415,33 +378,12 @@ class DubinsControl(ActionOperation):
                    [0.0, 0.0, 1.0]]
         rot_mat = np.reshape(rot_mat, (3, 3))
 
-        diff = np.subtract([samples[idx,0],samples[idx,1],samples[idx,2]], [entity_x,entity_y,heading])
+        diff = np.subtract([self.samples[idx,0],self.samples[idx,1],self.samples[idx,2]], [entity_x,entity_y,heading])
 
         error_vec = np.matmul(rot_mat, diff)
 
         v_mag = np.sqrt(entities[self.target_entity].state_dict['v_mag'])
         command = self.controller.get_command(delta_t,error_vec,v_mag)
-
-        # TODO remove after debugging
-        '''
-        print('samples')
-        for samp in samples:
-            for val in samp:
-                print(val, end="")
-                print(",", end="")
-            print()
-        print('target')
-        for val in samples[idx,:]:
-            print(val, end="")
-            print(",", end="")
-        print()
-        print("command")
-        print(command)
-        print()
-        print("entity")
-        print(entity_x,end=",")
-        print(entity_y )
-        '''
 
         # return the transfromed action
         return command
@@ -684,7 +626,7 @@ class DubinsControl(ActionOperation):
 
         return samples
 
-    def setPersistentInfo(self,entities,sensors):
+    def setPersistentInfo(self,entities,sensors, action_vector):
         """
         Save information about the first time an action is built. This allows for the simulation to get more
         actuator command updates while keep the original information needed to build the dubins path.
@@ -692,11 +634,36 @@ class DubinsControl(ActionOperation):
         :param sensors: An ordered dictionary containing the sensors in a simulation.
         :return:
         """
-
         # save the root of the bsline to build the spline from
         self.start_location = [entities[self.target_entity].state_dict['x_pos'],
                                entities[self.target_entity].state_dict['y_pos']]
         self.start_angle = entities[self.target_entity].state_dict['phi']
+
+        # build the path
+        if self.is_continuous:
+            path_description = copy.deepcopy(action_vector)
+            for i, action in enumerate(action_vector):
+                path_description[i] = (action - self.output_range[0]) * (self.action_bounds[i][1]-self.action_bounds[i][0]) / (self.output_range[1]-self.output_range[0]) + self.action_bounds[i][0]
+        else:
+            # discrete
+            path_description = self.action_options[action_vector]
+
+        # build the dubins path and get eht samples
+        #start = [entities[self.target_entity].state_dict['x_pos'],entities[self.target_entity].state_dict['y_pos'],entities[self.target_entity].state_dict['phi']]
+        #end_theta = entities[self.target_entity].state_dict['phi']+path_description[0]+path_description[2]
+        start = [self.start_location[0], self.start_location[1],
+                 self.start_angle]
+        end_theta = self.start_angle + path_description[0] + path_description[2]
+        if end_theta > np.pi*2.0:
+            end_theta -= np.pi*2.0
+        elif end_theta < 0.0:
+            end_theta += np.pi*2.0
+        end = [self.start_location[0] + path_description[1]*np.cos(self.start_angle + path_description[0]),
+               self.start_location[1] + path_description[1]*np.sin(self.start_angle + path_description[0]),
+               end_theta]
+        radius = path_description[3]
+        self.samples = self.build_shortest_dubins( start, end, radius, radius)
+
 
         presistentInfo = OrderedDict()
         presistentInfo['x_init'] = self.start_location[0]
@@ -1085,7 +1052,7 @@ class RLProbablisticRoadMap(ActionOperation):
 
         return path, count
 
-    def setPersistentInfo(self,entities,sensors):
+    def setPersistentInfo(self,entities,sensors,action_vector):
         """
         Save information about the action chosen at the simulation step it is chosen. This enables only storing copies
         of the needed information needed to reconstruct the action. For the bspline, the angles and starting conditions

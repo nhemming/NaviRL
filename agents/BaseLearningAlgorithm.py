@@ -60,6 +60,10 @@ class BaseLearningAlgorithm(ABC):
         # set is_new_action to false.
         pass
 
+    @abstractmethod
+    def load_networks(self, model_path, model_num):
+        pass
+
     def forward(self,state):
         """
         runs the neural network and returns the output
@@ -138,12 +142,12 @@ class BaseLearningAlgorithm(ABC):
             else:
                 mdp_tuple[name] = value
 
-    def write_history(self,agent_name,episode_number, file_path):
+    def write_history(self,agent_name,episode_number, file_path, eval_num=''):
         # TODO change from csv to sqlite data base
         # write history to csv
         df = pd.DataFrame(self.history_samples)
         file_path = os.path.join(file_path, 'learning_algorithm')
-        df.to_csv(os.path.abspath(os.path.join(file_path,str(agent_name)+'_'+str(self.name)+'_epnum-'+str(episode_number)+'.csv')), index=False)
+        df.to_csv(os.path.abspath(os.path.join(file_path,str(agent_name)+'_'+str(self.name)+'_epnum-'+str(episode_number)+eval_num+'.csv')), index=False)
 
     def load_optimizer(self, name, opt_dict, params):
         #opt = self.h_params['Optimizer']

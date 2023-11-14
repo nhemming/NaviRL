@@ -24,7 +24,7 @@ def main():
 
 
     env = NavigationEnvironment()
-    test_scenario_number = 2
+    test_scenario_number = 1
     input_file_name = ''
     if test_scenario_number == 0:
         input_file_name = 'experiment_setup_DDPG_vector_control.yaml'
