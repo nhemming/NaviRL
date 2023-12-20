@@ -19,7 +19,7 @@ import torch
 
 class DDPG(BaseLearningAlgorithm):
 
-    def __init__(self,device, exploration_strategy, general_params, name, network_description_actor, network_description_critic, observation_information, optimizer_dict, output_dim, replay_buffer, seed):
+    def __init__(self,device, exploration_strategy, general_params, name, network_description_actor, network_description_critic, observation_information, optimizer_dict, output_dim, replay_buffer, save_rate, seed):
         # device, exploration_strategy, general_params, name, observation_information
         super(DDPG, self).__init__(device, exploration_strategy, general_params, name, observation_information)
 
@@ -56,6 +56,7 @@ class DDPG(BaseLearningAlgorithm):
 
         self.last_target_update = -np.infty
         self.loss_header = "Episode_number,actor_loss,critic_loss\n"
+        self.save_rate = save_rate
 
     def init_state_action(self,action_operation,entities,sensors):
         # call the action operation preperation step.
@@ -153,7 +154,7 @@ class DDPG(BaseLearningAlgorithm):
 
             # check and update target network if needed
             if ep_num - self.last_target_update > self.target_update_rate:
-                self.save_model(ep_num, file_path)
+
                 self.last_target_update = ep_num
 
                 # soft update critic target network
@@ -165,6 +166,10 @@ class DDPG(BaseLearningAlgorithm):
                 for target_param, local_param in zip(self.actor_target_network.parameters(),
                                                      self.actor_network.parameters()):
                     target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
+
+            # check if model should be saved
+            if ep_num % self.save_rate == 0:
+                self.save_model(ep_num, file_path)
 
     def update_memory(self, action_operation, done, entities, reward, sensors, sim_time):
 

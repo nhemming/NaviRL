@@ -7,13 +7,13 @@ Entities:
       #height: 4.0  # [m]
       #width: 10.0  # [m]
       type: circle
-      radius: 0.5 # [m]
+      radius: 0.25 # [m]
   StaticEntity:
     name: destination
     id: 1
-    #collision_object:
-    #  type: circle
-    #  radius: 1.0 # [m]
+    collision_object: # no collision is actually here. Just used for rendering.
+      type: circle
+      radius: 0.25 # [m]
 Environment:
   domain:
     min_x: 0 # [m]
@@ -21,7 +21,7 @@ Environment:
     min_y: 0 # [m]
     max_y: 5 # [m]
     buffer: 0.5 # [m]
-  time_step: 0.5 # [s]
+  time_step: 0.1 # [s]
 ExplorationStrategies:
   strategy1:
     name: EpsilonGreedy_0
@@ -29,26 +29,17 @@ ExplorationStrategies:
       dist0: 0.0,0.1
     threshold_schedule:
       point0: 0,0.95 # x point, threshold for if a random number is added
-      point1: 500,0.2
+      point1: 1000,0.2
     type: EpsilonGreedy
 LearningAgent:
   name: general_nav_0
   save_rate: 50
   type: SingleLearningAlgorithmAgent
   ActionOperation:
-    alg_name: rl_prm
-    frequency: 0.5 # [s]
-    graph_frequency: 25.0 # [s]
+    alg_name: basic_control
+    frequency: 0.1 # [s]
     is_continuous: True
-    max_connect_dst: 10.0 # [m]
-    model_radius: 2.0 # [m]
-    name: rl_probablistic_road_map
-    n_samples: 250 # [-]
-    target_entity: learning_entity
-    target_sensor: sub_destination_sensor_0
-    trans_dst: 0.1
-
-    # discreet solution
+    name: direct_vector_control
     number_controls: 1 # [-]
 
     # used to describe the options available for the discrete case and the bounds for each action
@@ -78,14 +69,14 @@ LearningAgent:
             norm_min: -1 # [-]
             norm_max: 1 # [-]
           item1:
-            name: sub_destination_sensor_0
+            name: destination_prm_sensor_0
             data: angle
             min: -3.14159265359 # [rad]
             max: 3.14159265359 # [rad]
             norm_min: -1 # [-]
             norm_max: 1 # [-]
           item2:
-            name: sub_destination_sensor_0
+            name: destination_prm_sensor_0
             data: distance
             min: 0 # [m]
             max: 20 # [m]
@@ -133,30 +124,30 @@ LearningAgent:
         type: vanilla
   
 MetaData:
-  num_episodes: 1000
+  num_episodes: 1500
   seed: 0
   set: DebugDDPGRLPRM
   training_sim_time: 100.0
-  trial_num: 5
+  trial_num: 11
 
 RewardDefinition:
   component0:
     adj_factor: 1.0
-    destination_sensor: sub_destination_sensor_0
-    goal_dst: 1.0
+    destination_sensor: destination_prm_sensor_0
+    goal_dst: 0.5
     reward: 1.0
     target_agent: general_nav_0
     target_lrn_alg: DDPG_0
     type: reach_destination
   component1:
     adj_factor: 0.01
-    destination_sensor: sub_destination_sensor_0
+    destination_sensor: destination_prm_sensor_0
     target_agent: general_nav_0
     target_lrn_alg: DDPG_0
     type: heading_improvement
   component2:
     adj_factor: 0.1
-    destination_sensor: sub_destination_sensor_0
+    destination_sensor: destination_prm_sensor_0
     target_agent: general_nav_0
     target_lrn_alg: DDPG_0
     type: close_distance
@@ -164,7 +155,7 @@ RewardDefinition:
     adj_factor: 0.01
     aligned_angle: 0.087264
     aligned_reward: 1.0
-    destination_sensor: sub_destination_sensor_0
+    destination_sensor: destination_prm_sensor_0
     target_agent: general_nav_0
     target_lrn_alg: DDPG_0
     type: aligned_heading
@@ -177,14 +168,23 @@ Sensors:
     owner: learning_entity
     target: destination
   sensor1:
-    type: sub_destination_sensor
-    name: sub_destination_sensor_0
+    type: destination_prm_sensor
+    name: destination_prm_sensor_0
     id: 1
     owner: learning_entity
+    target: destination
+    graph_frequency: 25.0 # [s]
+    max_connect_dst: 3.0 # [m]
+    model_radius: 1.0 # [m]
+    n_samples: 250 # [-]
+    sample_domain_x: -5.0,5.0
+    sample_domain_y: -5.0,5.0
+    target_entity: learning_entity
+    trans_dst: 0.5
 TerminationDefinition:
   component0:
     destination_sensor: destination_sensor_0
-    goal_dst: 1.0
+    goal_dst: 0.5
     name: reach_destination_0
     target_agent: general_nav_0
     type: reach_destination

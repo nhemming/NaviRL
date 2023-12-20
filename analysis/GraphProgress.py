@@ -38,8 +38,8 @@ def main():
 
     # set experiments to evaluate
     base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGDubins'
-    trial_num = 2
+    set_name = 'DebugDDPGRLPRM'
+    trial_num = 10
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)

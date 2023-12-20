@@ -5,10 +5,12 @@ Environment for navigation tasks. Controls the building, running, and saving the
 # native modules
 from collections import namedtuple, OrderedDict
 import os
+import random
 
 # 3rd party modules
 import numpy as np
 import pandas as pd
+import torch
 import yaml
 
 # own modules
@@ -20,7 +22,7 @@ from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
-from environment.Sensor import DestinationSensor, SubDestinationSensor
+from environment.Sensor import DestinationSensor, DestinationPRMSensor
 from environment.StaticEntity import StaticEntity, StaticEntityCollide
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
 from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
@@ -75,6 +77,9 @@ class NavigationEnvironment:
             except yaml.YAMLError as exc:
                 print(exc)
         self.h_params = hp_data
+
+        # set random seed
+        self.set_random_seeds(self.h_params['MetaData']['seed'])
 
         # load domain information
         domain_data = self.h_params['Environment']['domain']
@@ -134,7 +139,7 @@ class NavigationEnvironment:
             with open(os.path.join(output_dir,'hyper_parameters.yaml'), 'w') as file:
                 yaml.safe_dump(self.h_params, file)
 
-    def build_eval_env_from_yaml(self, eval_file_name, base_dir):
+    def build_eval_env_from_yaml(self, eval_file_name, base_dir,create=True):
 
         with open(eval_file_name, "r") as stream:
             try:
@@ -144,9 +149,12 @@ class NavigationEnvironment:
 
         # open eval data to get file name of experiment
         exp_data = eval_data['BaseExperiment']
+        base_dir = base_dir.replace('\\analysis', '\\experiments') # used for analysis of evaluation set
         base_items = base_dir.split("\\")
         substr = base_items.pop()
-        exp_file_name = base_dir.replace(substr,'')
+        exp_file_name = base_dir
+        if create:
+            exp_file_name = base_dir.replace(substr,'')
         folders_to_add = [exp_data['base_folder'],'output',exp_data['set_name'],str(exp_data['trial_num']), 'hyper_parameters.yaml']
         for folder in folders_to_add:
             exp_file_name = os.path.join(exp_file_name,folder)
@@ -214,6 +222,11 @@ class NavigationEnvironment:
             except:
                 pass
 
+        # save input of evaulation set
+        if create:
+            with open(os.path.join(file_path, 'initial_condition_eval_set.yaml'), 'w') as file:
+                yaml.safe_dump(eval_data, file)
+
     def load_entities(self):
         """
         From the data in the input file, entities are created and saved. The entities are the physical or pseudo
@@ -243,7 +256,7 @@ class NavigationEnvironment:
                 ba = MassFreeVectorEntity(collision_shape, item['id'], item['name'])
                 self.entities[ba.name] = ba
             elif value == 'StaticEntity':
-                se = StaticEntity(item['id'],item['name'])
+                se = StaticEntity(item['id'],item['name'], collision_shape)
                 self.entities[se.name] = se
             elif value == 'StaticEntityCollide':
                 # create a basic entity that does not move. Typically, used for static obstacles and destination areas.
@@ -263,9 +276,27 @@ class NavigationEnvironment:
             if item['type'] == 'destination_sensor':
                 ds = DestinationSensor(item['id'], item['name'], item['owner'], item['target'])
                 self.sensors[ds.name] = ds
-            elif item['type'] == 'sub_destination_sensor':
-                sds = SubDestinationSensor(item['id'], item['name'], item['owner'])
-                self.sensors[sds.name] = sds
+            elif item['type'] == 'destination_prm_sensor':
+
+                # build the sample domain
+                sdx = [float(i) for i in item['sample_domain_x'].split(',')]
+                sdy = [float(i) for i in item['sample_domain_y'].split(',')]
+                sample_domain = np.zeros((2,2))
+                sample_domain[:,0] = sdx
+                sample_domain[:,1] = sdy
+
+                # handle the node connection method
+                model_path = ''
+                if item.get('model_path',None) is not None:
+                    model_path = item['model_path']
+
+                model_radius = None
+                if item.get('model_radius',None) is not None:
+                    model_radius = item['model_radius']
+
+                dprms = DestinationPRMSensor(item['graph_frequency'],item['id'], item['max_connect_dst'],
+                    item['name'], item['n_samples'],item['owner'] , sample_domain ,item['target'],item['trans_dst'], model_path, model_radius)
+                self.sensors[dprms.name] = dprms
             else:
                 raise ValueError('Invalid Sensor Type')
 
@@ -375,6 +406,7 @@ class NavigationEnvironment:
                           optimizer_dict,
                           len(ao.action_bounds),
                           replay_buffer,
+                          self.h_params['LearningAgent']['save_rate'],
                           self.h_params['MetaData']['seed'])
                 agent.learning_algorithms[ddpg.name] = ddpg
 
@@ -555,21 +587,7 @@ class NavigationEnvironment:
         for name, reward_comp in self.reward_function.reward_components.items():
             reward_comp.reset(self.entities, self.sensors, self.reward_function.reward_agents)
 
-        # init action operation functions.
-        # loop over agents and precalculate action operation information. Most action operations do not use this.
-        # this function is only called when the input
-        for name, tmp_agent in self.agents.items():
-            tmp_agent.init_state_action(self.entities, self.sensors)
-
         while not done and sim_time < max_time:
-
-            # TODO remove print
-            #print(sim_time)
-
-            # need a prep state action. Most action operations do not need this. Only when the action operation effects
-            # the input state of the neural network, does a function in this call stack become activated.
-            for name, tmp_agent in self.agents.items():
-                tmp_agent.prep_state_action(self.entities, self.sensors, sim_time)
 
             # loop over agents both learning and non-learning
             # select action -> state_dict, action_dict
@@ -737,3 +755,16 @@ class NavigationEnvironment:
             history_path = os.path.join(self.output_dir, 'training')
             self.run_simulation(episode_num, history_path, self.max_training_time, True)
         '''
+
+    def set_random_seeds(self, random_seed):
+        """Sets all possible random seeds so results can be reproduced"""
+        os.environ['PYTHONHASHSEED'] = str(random_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.manual_seed(random_seed)
+        # tf.set_random_seed(random_seed)
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(random_seed)
+            torch.cuda.manual_seed(random_seed)

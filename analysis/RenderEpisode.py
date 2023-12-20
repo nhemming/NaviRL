@@ -210,6 +210,8 @@ class AnimateEpisode:
 
                 sensor.draw_at_time(ax3, tmp_frames, sim_time)
 
+                sensor.draw_traj( ax1, tmp_frames, sim_time)
+
             # graph action operation information
 
             #plt.suptitle('Trajectories for Episode=' + str(ep_num) + ' Trial Group=' + str(ep_num) + ' Trial Number=' + str(trial_number) )
@@ -228,9 +230,9 @@ def main():
 
     # set experiments to evaluate
     base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGDubins'
-    trial_num = 1
-    ep_num_vec = range(400,410)
+    set_name = 'DebugDDPGRLPRM'
+    trial_num = 10
+    ep_num_vec = range(4050,4060)
     create_video = True
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')

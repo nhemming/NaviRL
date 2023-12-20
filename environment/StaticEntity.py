@@ -14,8 +14,10 @@ from environment.Entity import CollideEntity, CollisionCircle, CollisionRectangl
 
 class StaticEntity(Entity):
 
-    def __init__(self, id, name):
+    def __init__(self, id, name, shape):
         super(StaticEntity, self).__init__(id, name)
+
+        self.shape = shape
 
     def step(self, delta_t):
         # do nothing
@@ -36,7 +38,7 @@ class StaticEntity(Entity):
         # draw shape
         #if isinstance(self.collision_shape, CollisionCircle):
         row = data.loc[data['sim_time'] == sim_time]
-        circle = plt.Circle((row['x_pos'], row['y_pos']), radius=1.0, color='tab:green',alpha=0.3)
+        circle = plt.Circle((row['x_pos'], row['y_pos']), radius=self.shape.radius, color='tab:green',alpha=0.3)
         ax.add_patch(circle)
 
     def draw_telemetry_trajectory(self, ax, data, sim_time):

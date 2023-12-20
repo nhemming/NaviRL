@@ -136,7 +136,7 @@ LearningAgent:
         type: vanilla
   
 MetaData:
-  num_episodes: 2000
+  num_episodes: 2001
   seed: 0
   set: DebugDDPGBSpline
   training_sim_time: 100.0

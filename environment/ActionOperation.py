@@ -59,12 +59,6 @@ class DirectVectorControl(ActionOperation):
     def __init__(self, action_options_dict, controller, frequency, is_continuous, name, number_controls):
         super(DirectVectorControl, self).__init__(action_options_dict,controller,frequency,is_continuous,name, number_controls)
 
-    def init_state_action(self, entities, sensors):
-        pass
-
-    def prep_state_action(self, entities, sensors, sim_time):
-        pass
-
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
         Simple scaling of outputs of the network to the dimensions of the action control
@@ -82,7 +76,10 @@ class DirectVectorControl(ActionOperation):
 
         return transformed_action
 
-    def setPersistentInfo(self,entities,sensors):
+    def setPersistentInfo(self,entities,sensors, action_vector):
+        pass
+
+    def draw_persistent(self, ax, df, sim_time):
         pass
 
 
@@ -110,12 +107,6 @@ class BSplineControl(ActionOperation):
         self.start_location = []
         self.start_angle = None
         self.samples = []
-
-    def init_state_action(self, entities, sensors):
-        pass
-
-    def prep_state_action(self, entities, sensors, sim_time):
-        pass
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
@@ -331,12 +322,6 @@ class DubinsControl(ActionOperation):
         self.start_location = []
         self.start_angle = None
         self.samples = []
-
-    def init_state_action(self, entities, sensors):
-        pass
-
-    def prep_state_action(self, entities, sensors, sim_time):
-        pass
 
     def convert_action(self, action_vector, delta_t, entities, sensors):
         """
