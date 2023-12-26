@@ -20,77 +20,8 @@ import seaborn as sns
 from environment.NavigationEnvironment import NavigationEnvironment
 from environment.Reward import ReachDestinationReward
 from environment.Sensor import DestinationSensor
+from environment.Termination import ReachDestinationTermination
 
-def graph_results(data):
-
-    sns.set_theme()
-
-    # plot success rate
-    fig = plt.figure(0,figsize=(14,8))
-    ax1 = fig.add_subplot(111)
-    ax1.plot(data['ep_num'],data['success'],label='mean')
-    ax1.fill_between(data['ep_num'], data['success'] + data['success_std'],data['success'] - data['success_std'], facecolor='tab:blue', alpha=0.3, label='1 $\sigma$')
-    # graph max line
-    ax1.plot(data['ep_num'], data['success_max'], '-', color='tab:purple', label='Max')
-    # graph min line
-    ax1.plot(data['ep_num'], data['success_min'], '-', color='tab:green', label='Min')
-    ax1.set_xlabel('Episode Number [-]')
-    ax1.set_ylabel('Average Success Rate [-]')
-    ax1.legend()
-    plt.tight_layout()
-
-    # plot crash rate
-    fig = plt.figure(1, figsize=(14, 8))
-    ax1 = fig.add_subplot(111)
-    ax1.plot(data['ep_num'], data['crashed'],label='mean')
-    ax1.fill_between(data['ep_num'], data['crashed'] + data['crashed_std'], data['crashed'] - data['crashed_std'],
-                     facecolor='tab:blue', alpha=0.3, label='1 $\sigma$')
-    # graph max line
-    ax1.plot(data['ep_num'], data['crashed_max'], '-', color='tab:purple', label='Max')
-    # graph min line
-    ax1.plot(data['ep_num'], data['crashed_min'], '-', color='tab:green', label='Min')
-    ax1.set_xlabel('Episode Number [-]')
-    ax1.set_ylabel('Average Crash Rate [-]')
-    ax1.legend()
-    plt.tight_layout()
-
-    # plot distance to reach goal
-    fig = plt.figure(2, figsize=(14, 8))
-    ax1 = fig.add_subplot(111)
-    ax1.plot(data['ep_num'], data['distance_traveled[m]'],label='mean')
-    ax1.fill_between(data['ep_num'], data['distance_traveled[m]'] + data['distance_traveled[m]_std'], data['distance_traveled[m]'] - data['distance_traveled[m]_std'],
-                     facecolor='tab:blue', alpha=0.3, label='1 $\sigma$')
-
-    # graph max line
-    ax1.plot(data['ep_num'], data['distance_traveled[m]_max'], '-', color='tab:purple', label='Max')
-    # graph min line
-    ax1.plot(data['ep_num'], data['distance_traveled[m]_min'], '-', color='tab:green', label='Min')
-    ax1.set_xlabel('Episode Number [-]')
-    ax1.set_ylabel('Average Distance Traveled [m]')
-    ax1.legend()
-    plt.tight_layout()
-
-    # plot normalized distance to reach goal
-    fig = plt.figure(3, figsize=(14, 8))
-    ax1 = fig.add_subplot(111)
-    ax1.plot(data['ep_num'], data['normalized_distance_traveled'],label='mean')
-    ax1.fill_between(data['ep_num'], data['normalized_distance_traveled'] + data['normalized_distance_traveled_std'],
-                     data['normalized_distance_traveled'] - data['normalized_distance_traveled_std'],
-                     facecolor='tab:blue', alpha=0.3, label='1 $\sigma$')
-
-    # graph max line
-    ax1.plot(data['ep_num'], data['normalized_distance_traveled_max'],'-',color='tab:purple',label='Max')
-    # graph min line
-    ax1.plot(data['ep_num'], data['normalized_distance_traveled_min'], '-', color='tab:green',label='Min')
-
-    # TODO add timeout exclusion graph also.
-    ax1.plot([0,data['ep_num'].max()],[1.0,1.0],'--',color='tab:gray',label='Crow Flies Distance')
-    ax1.set_xlabel('Episode Number [-]')
-    ax1.set_ylabel('Normalized Average Distance Traveled [-]')
-    ax1.legend()
-    plt.tight_layout()
-
-    plt.show()
 
 def load_environment(base_folder, set_name, trial_num):
     file_name = os.path.join(base_folder, 'initial_condition_eval_set.yaml')
@@ -99,16 +30,8 @@ def load_environment(base_folder, set_name, trial_num):
     env.build_eval_env_from_yaml(file_name,os.getcwd(), create=False) # TODO investigate correct input dir
     return env
 
-def extract_data():
 
-    base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGRLPRM'
-    trial_num = 10
-    eval_trial_num = 0
-
-    """
-    Edit above ^^
-    """
+def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)
@@ -135,9 +58,16 @@ def extract_data():
     file_path_entities = file_dir.replace('learning_algorithm', 'entities')
 
     # get goal distance
+    goal_dst = None
     for name, reward_comp in env.reward_function.reward_components.items():
         if isinstance(reward_comp, ReachDestinationReward):
             goal_dst = reward_comp.goal_dst
+
+    if goal_dst is None:
+        # search in termination function for non-learning agent
+        for name, term_func in env.termination_function.components.items():
+            if isinstance(term_func, ReachDestinationTermination):
+                goal_dst = term_func.goal_dst
 
     # Loop over each initial contidion
     ic_dict = dict()
@@ -231,14 +161,22 @@ def extract_data():
     df_min = df_min.rename(columns=name_dict)
     df_avg = pd.concat((df_avg, df_min), axis=1)
 
+    # save the data
+    df_avg.to_csv(os.path.join(base_dir,'OverallResults.csv'),index=False)
 
-
-    # TODO move to seperate script once complete
-    graph_results(df_avg)
 
 if __name__ == '__main__':
 
+    base_folder = 'demo_to_test_non_learning'
+    set_name = 'DebugPRM'
+    trial_num = 0
+    eval_trial_num = 0
+
+    """
+    Edit above ^^
+    """
+
     # extract data
-    extract_data()
+    extract_data(base_folder, set_name, trial_num, eval_trial_num)
 
     # combine data that needs to be combined

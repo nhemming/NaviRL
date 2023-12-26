@@ -26,9 +26,10 @@ class BaseLearningAlgorithm(ABC):
         self.observation_information = observation_information
 
         # save the general learning parameters
-        self.gamma = general_params['gamma']
-        self.batch_size = general_params['batch_size']
-        self.num_batches = general_params['num_batches']
+        if general_params is not None:
+            self.gamma = general_params['gamma']
+            self.batch_size = general_params['batch_size']
+            self.num_batches = general_params['num_batches']
 
         # optimizer
         self.optimizer = OrderedDict()

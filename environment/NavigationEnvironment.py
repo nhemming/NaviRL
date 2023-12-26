@@ -14,8 +14,9 @@ import torch
 import yaml
 
 # own modules
-from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl, RLProbablisticRoadMap
-from environment.BaseAgent import SingleLearningAlgorithmAgent
+from environment.ActionOperation import BSplineControl, DirectVectorControl, DubinsControl, ModelControl
+from environment.BaseAgent import SingleLearningAlgorithmAgent, VoidAgent
+from agents.NoLearning import NoLearning
 from agents.actor_critic_agents.DDPG import DDPG
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
@@ -200,6 +201,10 @@ class NavigationEnvironment:
             if model_num not in self.model_nums:
                 self.model_nums.append(model_num)
 
+        if len(self.model_nums) == 0:
+            # a non-learning agent is assumed
+            self.model_nums = [0]
+
         # save the model numbers to be run.
         self.model_nums.sort()
 
@@ -307,30 +312,31 @@ class NavigationEnvironment:
         :return:
         """
 
-        es = self.h_params['ExplorationStrategies']
-        for value, item in es.items():
-            if item['type'] == 'EpsilonGreedy':
+        es = self.h_params.get('ExplorationStrategies',None)
+        if es is not None:
+            for value, item in es.items():
+                if item['type'] == 'EpsilonGreedy':
 
-                # parse the schedule for the threshold for choosing a random action
-                ts = item['threshold_schedule']
-                #num_entries = len(ts[list(ts.keys())[0]].split(','))
-                num_entries = 2
-                threshold_schedule = np.zeros((len(ts),num_entries))
-                k = 0
-                for tmp_value, tmp_item in ts.items():
-                    point = [float(i) for i in tmp_item.split(',')]
-                    threshold_schedule[k,:] = point
-                    k += 1
+                    # parse the schedule for the threshold for choosing a random action
+                    ts = item['threshold_schedule']
+                    #num_entries = len(ts[list(ts.keys())[0]].split(','))
+                    num_entries = 2
+                    threshold_schedule = np.zeros((len(ts),num_entries))
+                    k = 0
+                    for tmp_value, tmp_item in ts.items():
+                        point = [float(i) for i in tmp_item.split(',')]
+                        threshold_schedule[k,:] = point
+                        k += 1
 
-                # parse the perturbation distribution definitions
-                if self.h_params['LearningAgent']['ActionOperation']['is_continuous']:
-                    ds = item['distribution']
-                else:
-                    ds = None
-                action_definition = self.h_params['LearningAgent']['ActionOperation']['action_options']
+                    # parse the perturbation distribution definitions
+                    if self.h_params['LearningAgent']['ActionOperation']['is_continuous']:
+                        ds = item['distribution']
+                    else:
+                        ds = None
+                    action_definition = self.h_params['LearningAgent']['ActionOperation']['action_options']
 
-                eg = EpsilonGreedy(self.h_params['LearningAgent']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, action_definition, ds)
-                self.exploration_strategies[eg.name] = eg
+                    eg = EpsilonGreedy(self.h_params['LearningAgent']['device'],self.h_params['LearningAgent']['ActionOperation']['is_continuous'], item['name'], threshold_schedule, action_definition, ds)
+                    self.exploration_strategies[eg.name] = eg
 
     def load_learning_agent(self):
         """
@@ -346,72 +352,80 @@ class NavigationEnvironment:
         ao = self.load_action_operation()
         if la['type'] == 'SingleLearningAlgorithmAgent':
             agent = SingleLearningAlgorithmAgent(ao,la['ControlledEntity'],la['name'],la['save_rate'])
+
+            # get learning algorithms
+            alg = la['LearningAlgorithm']
+            for lrn_alg_name, lrn_alg_data in alg.items():
+                # optimizer dict
+
+                optimizer_dict = lrn_alg_data['Optimizer']
+
+                la_input = lrn_alg_data['Input']
+                if lrn_alg_data['type'] == 'DQN':
+                    # create a DQN agent
+
+                    # parse replay buffer
+                    replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
+
+                    head_dict = OrderedDict()
+                    for head_name, head_data in la_input.items():
+                        row_list = []
+                        for value, item in head_data.items():
+                            row_list.append(item)
+                        obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'],
+                                              data=row_list)
+                        head_dict[head_name] = obs_df
+                    dqn = DQN(la['device'],
+                              self.exploration_strategies[lrn_alg_data['exploration_strategy']],
+                              lrn_alg_data,
+                              lrn_alg_data['name'],
+                              lrn_alg_data['Network'],
+                              head_dict,
+                              optimizer_dict,
+                              len(ao.action_options),
+                              replay_buffer,
+                              self.h_params['MetaData']['seed'])
+                    agent.learning_algorithms[dqn.name] = dqn
+
+                elif lrn_alg_data['type'] == 'DDPG':
+                    # create a DDPG agent
+
+                    # parse replay buffer
+                    replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
+
+                    head_dict = OrderedDict()
+                    for head_name, head_data in la_input.items():
+                        row_list = []
+                        for value, item in head_data.items():
+                            row_list.append(item)
+                        obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'],
+                                              data=row_list)
+                        head_dict[head_name] = obs_df
+
+                    ddpg = DDPG(la['device'],
+                                self.exploration_strategies[lrn_alg_data['exploration_strategy']],
+                                lrn_alg_data,
+                                lrn_alg_data['name'],
+                                lrn_alg_data['NetworkActor'],
+                                lrn_alg_data['NetworkCritic'],
+                                head_dict,
+                                optimizer_dict,
+                                len(ao.action_bounds),
+                                replay_buffer,
+                                self.h_params['LearningAgent']['save_rate'],
+                                self.h_params['MetaData']['seed'])
+                    agent.learning_algorithms[ddpg.name] = ddpg
+
+                else:
+                    raise ValueError('Learning Algorithm not supported')
+
+        elif la['type'] == 'ControllerAgent':
+            agent = VoidAgent(ao,la['ControlledEntity'],la['name'],None)
+            nol = NoLearning()
+            agent.learning_algorithms[nol.name] = nol
         else:
             raise ValueError('Agent type not supported')
 
-        # get learning algorithms
-        alg = la['LearningAlgorithm']
-        for lrn_alg_name, lrn_alg_data in alg.items():
-            # optimizer dict
-
-            optimizer_dict = lrn_alg_data['Optimizer']
-
-            la_input = lrn_alg_data['Input']
-            if lrn_alg_data['type'] == 'DQN':
-                # create a DQN agent
-
-                # parse replay buffer
-                replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
-
-                head_dict = OrderedDict()
-                for head_name, head_data in la_input.items():
-                    row_list = []
-                    for value, item in head_data.items():
-                        row_list.append(item)
-                    obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'], data=row_list)
-                    head_dict[head_name] = obs_df
-                dqn = DQN(la['device'],
-                            self.exploration_strategies[lrn_alg_data['exploration_strategy']],
-                            lrn_alg_data,
-                            lrn_alg_data['name'],
-                            lrn_alg_data['Network'],
-                            head_dict,
-                            optimizer_dict,
-                            len(ao.action_options),
-                            replay_buffer,
-                            self.h_params['MetaData']['seed'])
-                agent.learning_algorithms[dqn.name] = dqn
-
-            elif lrn_alg_data['type'] == 'DDPG':
-                # create a DDPG agent
-
-                # parse replay buffer
-                replay_buffer = self.load_replay_buffer(lrn_alg_data, la['device'])
-
-                head_dict = OrderedDict()
-                for head_name, head_data in la_input.items():
-                    row_list = []
-                    for value, item in head_data.items():
-                        row_list.append(item)
-                    obs_df = pd.DataFrame(columns=['name', 'data', 'min', 'max', 'norm_min', 'norm_max'], data=row_list)
-                    head_dict[head_name] = obs_df
-
-                ddpg = DDPG(la['device'],
-                          self.exploration_strategies[lrn_alg_data['exploration_strategy']],
-                          lrn_alg_data,
-                          lrn_alg_data['name'],
-                          lrn_alg_data['NetworkActor'],
-                          lrn_alg_data['NetworkCritic'],
-                          head_dict,
-                          optimizer_dict,
-                          len(ao.action_bounds),
-                          replay_buffer,
-                          self.h_params['LearningAgent']['save_rate'],
-                          self.h_params['MetaData']['seed'])
-                agent.learning_algorithms[ddpg.name] = ddpg
-
-            else:
-                raise ValueError('Learning Algorithm not supported')
         self.agents[agent.name] = agent
 
     def load_action_operation(self):
@@ -440,19 +454,11 @@ class NavigationEnvironment:
             op = DubinsControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
                                      ao['number_controls'], None, ao['target_entity'])
 
-        elif ao['name'] == 'rl_probablistic_road_map':
+        elif ao['name'] == 'model_controller':
 
-            model_radius = ao.get('model_radius',None)
-            model_path = ao.get('model_path',None)
-            use_simple_model = False
-            if model_radius is not None:
-                use_simple_model = True
-
-            op = RLProbablisticRoadMap(ao['action_options'],None,self.domain,ao['frequency'],ao['graph_frequency'],ao['is_continuous'],
-                                       ao['max_connect_dst'], ao['name'], ao['number_controls'],ao['n_samples'], None,
-                                       ao['target_entity'], ao['target_sensor'], ao['trans_dst'], use_simple_model,model_path,
-                                       model_radius)
-
+            # action_options_dict, controller, frequency, is_continuous, name, number_controls
+            op = ModelControl(ao['action_options'], controller, ao['frequency'], ao['is_continuous'], ao['name'],
+                                     ao['number_controls'], self.h_params['LearningAgent']['ControlledEntity'], ao['sensor_setpoint'])
         else:
             raise ValueError('Invalid action operation designation')
 
@@ -486,24 +492,25 @@ class NavigationEnvironment:
             agent_names.append(value.name)
         self.reward_function = RewardDefinition(agent_names)
 
-        rd = self.h_params['RewardDefinition']
-        self.reward_function.overall_adj_factor = rd['overall_adj_factor']
-        for name, value in rd.items():
-            if 'component' in name:
-                if value['type'] == 'aligned_heading':
-                    ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'],  value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
-                    self.reward_function.reward_components[ahr.name] = ahr
-                elif value['type'] == 'close_distance':
-                    cdr = CloseDistanceReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
-                    self.reward_function.reward_components[cdr.name] = cdr
-                elif value['type'] == 'heading_improvement':
-                    ihr = ImproveHeadingReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
-                    self.reward_function.reward_components[ihr.name] = ihr
-                elif value['type'] == 'reach_destination':
-                    rdr = ReachDestinationReward(value['adj_factor'], value['destination_sensor'], value['goal_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
-                    self.reward_function.reward_components[rdr.name] = rdr
-                else:
-                    raise ValueError('Unsupported reward component')
+        rd = self.h_params.get('RewardDefinition',None)
+        if rd is not None:
+            self.reward_function.overall_adj_factor = rd['overall_adj_factor']
+            for name, value in rd.items():
+                if 'component' in name:
+                    if value['type'] == 'aligned_heading':
+                        ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'],  value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        self.reward_function.reward_components[ahr.name] = ahr
+                    elif value['type'] == 'close_distance':
+                        cdr = CloseDistanceReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        self.reward_function.reward_components[cdr.name] = cdr
+                    elif value['type'] == 'heading_improvement':
+                        ihr = ImproveHeadingReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        self.reward_function.reward_components[ihr.name] = ihr
+                    elif value['type'] == 'reach_destination':
+                        rdr = ReachDestinationReward(value['adj_factor'], value['destination_sensor'], value['goal_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
+                        self.reward_function.reward_components[rdr.name] = rdr
+                    else:
+                        raise ValueError('Unsupported reward component')
 
     def load_termination_function(self):
 
@@ -745,16 +752,6 @@ class NavigationEnvironment:
                 history_path = os.path.join(self.output_dir, 'evaluation') # TODO figure out what to do
                 history_path = os.path.join(history_path, str(self.eval_trial_num))
                 self.run_simulation(model_num, history_path, self.max_eval_time, use_exploration=True, is_training=False, eval_ic_num=i)
-
-        '''
-        max_num_episodes = self.h_params['MetaData']['num_episodes']
-        for episode_num in range(max_num_episodes):
-            print("Episode Number={}".format(episode_num))
-
-            # run training simulation
-            history_path = os.path.join(self.output_dir, 'training')
-            self.run_simulation(episode_num, history_path, self.max_training_time, True)
-        '''
 
     def set_random_seeds(self, random_seed):
         """Sets all possible random seeds so results can be reproduced"""

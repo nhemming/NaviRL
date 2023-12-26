@@ -204,10 +204,6 @@ class DestinationPRMSensor(Sensor):
         if target_entity is None:
             target_entity = sensors.get(self.target, None)
 
-        # reset last regraph time.Quick  hack.
-        #if time <= 1e-12:
-        #    self.last_reset_time = -np.infty
-
         if time - self.last_reset_time >= self.graph_frequency:
             self.last_reset_time = time
 
@@ -246,10 +242,16 @@ class DestinationPRMSensor(Sensor):
             sub_goal = self.path[self.sub_goal_idx, :2]
 
         dst = np.sqrt((curr_loc[0] - sub_goal[0]) ** 2 + (curr_loc[1] - sub_goal[1]) ** 2)
+        '''
         target_unit_vec = [np.cos(target_entity.state_dict['phi']),
                            np.sin(target_entity.state_dict['phi'])]
         goal_vec = [sub_goal[0] - curr_loc[0], sub_goal[1] - curr_loc[1]]
         mu = get_angle_between_vectors(target_unit_vec, goal_vec, True)
+        '''
+        owner_unit_vec = [np.cos(owner_entity.state_dict['phi']),
+                           np.sin(owner_entity.state_dict['phi'])]
+        goal_vec = [sub_goal[0] - curr_loc[0], sub_goal[1] - curr_loc[1]]
+        mu = get_angle_between_vectors(owner_unit_vec, goal_vec, True)
         if mu < 0:
             mu += 2.0 * np.pi
         elif mu > 2.0 * np.pi:

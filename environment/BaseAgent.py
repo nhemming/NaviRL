@@ -68,8 +68,14 @@ class BaseAgent(ABC):
         for _, lrn_alg in self.learning_algorithms.items():
             lrn_alg.save_model(episode_num,history_path)
 
+
 class SingleLearningAlgorithmAgent(BaseAgent):
 
     def __init__(self,action_operation,controlled_entity,name, save_rate):
         super(SingleLearningAlgorithmAgent, self).__init__(action_operation,controlled_entity,name,save_rate)
 
+
+class VoidAgent(BaseAgent):
+
+    def __init__(self,action_operation,controlled_entity,name, save_rate):
+        super(VoidAgent, self).__init__(action_operation,controlled_entity,name,save_rate)

@@ -128,7 +128,7 @@ MetaData:
   seed: 0
   set: DebugDDPGRLPRM
   training_sim_time: 100.0
-  trial_num: 11
+  trial_num: 0
 
 RewardDefinition:
   component0:
@@ -179,7 +179,6 @@ Sensors:
     n_samples: 250 # [-]
     sample_domain_x: -5.0,5.0
     sample_domain_y: -5.0,5.0
-    target_entity: learning_entity
     trans_dst: 0.5
 TerminationDefinition:
   component0:

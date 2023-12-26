@@ -58,12 +58,15 @@ class DDPG(BaseLearningAlgorithm):
         self.loss_header = "Episode_number,actor_loss,critic_loss\n"
         self.save_rate = save_rate
 
+    # TODO check if commented out section is needed
+    '''
     def init_state_action(self,action_operation,entities,sensors):
         # call the action operation preperation step.
         action_operation.init_state_action(entities,sensors)
 
     def prep_state_action(self,action_operation,entities,sensors,sim_time ):
         action_operation.prep_state_action(entities,sensors,sim_time )
+    '''
 
     def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
         """

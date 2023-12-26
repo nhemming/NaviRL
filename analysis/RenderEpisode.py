@@ -98,18 +98,22 @@ def graph_episode(env, ep_num, ep_num_key, frames, save_path):
     for name, agent in env.agents.items():
         for tmp_name, lrn_alg in agent.learning_algorithms.items():
             # slice the frame to relevant time
-            frames[name+'_'+tmp_name] = frames[name+'_'+tmp_name].loc[frames[name+'_'+tmp_name]['sim_time'] <= sim_time]
-            ax7.plot(frames[name+'_'+tmp_name]['sim_time'],frames[name+'_'+tmp_name]['reward'])
+            try:
+                # use try block incase non-learning agent used.
+                frames[name+'_'+tmp_name] = frames[name+'_'+tmp_name].loc[frames[name+'_'+tmp_name]['sim_time'] <= sim_time]
+                ax7.plot(frames[name+'_'+tmp_name]['sim_time'],frames[name+'_'+tmp_name]['reward'])
 
-            #ax8.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name]['applied_action'])
-            ax8.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name]['applied_action_0'])
+                # ax8.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name]['applied_action'])
+                ax8.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name]['applied_action_0'])
 
-            # need a better solution for q values
-            cols = frames[name+'_'+tmp_name].columns
-            q_val_header = [i for i in cols if 'q_values' in i]
-            for i, qv in enumerate(q_val_header):
-                ax9.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name][qv], label=str(i))
-            #ax9.legend()
+                # need a better solution for q values
+                cols = frames[name + '_' + tmp_name].columns
+                q_val_header = [i for i in cols if 'q_values' in i]
+                for i, qv in enumerate(q_val_header):
+                    ax9.plot(frames[name + '_' + tmp_name]['sim_time'], frames[name + '_' + tmp_name][qv], label=str(i))
+                # ax9.legend()
+            except:
+                pass
 
     plt.tight_layout()
     plt.savefig(os.path.join(save_path,str(ep_num)+'.png'))
@@ -193,9 +197,13 @@ class AnimateEpisode:
                         tmp_frames = frames[name + '_' + tmp_name].loc[
                             frames[name + '_' + tmp_name]['sim_time'] <= local_sim_time]
                     else :
-                        tmp_frames = frames[name + '_' + tmp_name].loc[
-                            frames[name + '_' + tmp_name]['sim_time'] <= sim_time]
-                    ax2.plot(tmp_frames['sim_time'], tmp_frames['reward'])
+                        try:
+                            # try for when useing non-learning agent. Non-learning does not have any data to report, so can't load it
+                            tmp_frames = frames[name + '_' + tmp_name].loc[frames[name + '_' + tmp_name]['sim_time'] <= sim_time]
+                        except:
+                            tmp_frames = None
+                    if tmp_frames is not None:
+                        ax2.plot(tmp_frames['sim_time'], tmp_frames['reward'])
 
                     env.agents[name].action_operation.draw_persistent(ax1, tmp_frames, local_sim_time)
 
@@ -229,10 +237,10 @@ class AnimateEpisode:
 def main():
 
     # set experiments to evaluate
-    base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGRLPRM'
-    trial_num = 10
-    ep_num_vec = range(4050,4060)
+    base_folder = 'demo_to_test_non_learning'
+    set_name = 'DebugPRM'
+    trial_num = 0
+    ep_num_vec = range(0,10)
     create_video = True
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')
@@ -272,8 +280,12 @@ def main():
 
                 file_of_item = [i for i in dir_list if name+'_'+tmp_name+'_'+ep_num_key in i][0]
                 file_of_item = os.path.join(file_dir,file_of_item)
-                tmp_frame = pd.read_csv(file_of_item,index_col=False)
-                frames[name+'_'+tmp_name] = tmp_frame
+                try:
+                    # try becuase non-learning agent does not have any data here
+                    tmp_frame = pd.read_csv(file_of_item,index_col=False)
+                    frames[name+'_'+tmp_name] = tmp_frame
+                except:
+                    pass
 
         if create_video:
             render_episode(env,episode_num, ep_num_key, frames, os.path.join(base_dir,'training','videos'))
