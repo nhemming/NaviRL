@@ -1,6 +1,6 @@
 BaseExperiment:
-  base_folder: demo_to_test_DDPG
-  set_name: DebugDDPGDubins
+  base_folder: demo_to_test_non_learning
+  set_name: DebugRRT
   trial_num: 2
 Entities:
   learning_entity:

@@ -238,8 +238,8 @@ def main():
 
     # set experiments to evaluate
     base_folder = 'demo_to_test_non_learning'
-    set_name = 'DebugPRM'
-    trial_num = 0
+    set_name = 'DebugRRT'
+    trial_num = 2
     ep_num_vec = range(0,10)
     create_video = True
 

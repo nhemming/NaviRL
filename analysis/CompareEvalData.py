@@ -211,6 +211,13 @@ if __name__ == '__main__':
         'eval_trial_num': 0}
     sets_to_compare['PRM'] = set_3
 
+    set_4 = {
+        'base_folder': 'demo_to_test_non_learning',
+        'set_name': 'DebugRRT',
+        'trial_num': 2,
+        'eval_trial_num': 0}
+    sets_to_compare['RRT'] = set_4
+
     """
     Edit above ^^
     """

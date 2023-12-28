@@ -168,7 +168,7 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 if __name__ == '__main__':
 
     base_folder = 'demo_to_test_non_learning'
-    set_name = 'DebugPRM'
+    set_name = 'DebugRRT'
     trial_num = 0
     eval_trial_num = 0
 

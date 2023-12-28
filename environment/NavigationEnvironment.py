@@ -23,7 +23,7 @@ from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
-from environment.Sensor import DestinationSensor, DestinationPRMSensor
+from environment.Sensor import DestinationSensor, DestinationPRMSensor, DestinationRRTStarSensor
 from environment.StaticEntity import StaticEntity, StaticEntityCollide
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
 from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
@@ -302,6 +302,28 @@ class NavigationEnvironment:
                 dprms = DestinationPRMSensor(item['graph_frequency'],item['id'], item['max_connect_dst'],
                     item['name'], item['n_samples'],item['owner'] , sample_domain ,item['target'],item['trans_dst'], model_path, model_radius)
                 self.sensors[dprms.name] = dprms
+            elif item['type'] == 'destination_rrtstar_sensor':
+
+                # build the sample domain
+                sdx = [float(i) for i in item['sample_domain_x'].split(',')]
+                sdy = [float(i) for i in item['sample_domain_y'].split(',')]
+                sample_domain = np.zeros((2,2))
+                sample_domain[:,0] = sdx
+                sample_domain[:,1] = sdy
+
+                # handle the node connection method
+                model_path = ''
+                if item.get('model_path',None) is not None:
+                    model_path = item['model_path']
+
+                model_radius = None
+                if item.get('model_radius',None) is not None:
+                    model_radius = item['model_radius']
+
+                # graph_frequency, link_dst,  id, name, neighbor_radius, n_samples, owner, sample_domain, target, trans_dst,  model_path='', model_radius=None
+                drrts = DestinationRRTStarSensor(item['graph_frequency'], item['link_dst'],item['id'],
+                    item['name'], item['neighbor_radius'], item['n_samples'],item['owner'] , sample_domain ,item['target'],item['trans_dst'], model_path, model_radius)
+                self.sensors[drrts.name] = drrts
             else:
                 raise ValueError('Invalid Sensor Type')
 
