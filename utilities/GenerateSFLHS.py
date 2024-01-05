@@ -273,7 +273,7 @@ def space_filling_latin_hyper_cube(n_points,n_vars, pop_size, max_iter):
 
     # save the lhs
     df = pd.DataFrame(data=lhs_plan)
-    df.to_csv('Npoints-' + str(n_points) + '_Nvars-' + str(n_vars)+'_sflhs.csv')
+    df.to_csv('Npoints-' + str(n_points) + '_Nvars-' + str(n_vars)+'_sflhs.csv',index=False)
 
     if len(lhs_plan[0,:]) == 2:
         sns.set_theme()
@@ -288,9 +288,9 @@ def space_filling_latin_hyper_cube(n_points,n_vars, pop_size, max_iter):
 
 if __name__ == '__main__':
 
-    n_points = 30
-    n_vars = 3
-    pop = 20
-    max_iter = 500
+    n_points = 10
+    n_vars = 2
+    pop = 100
+    max_iter = 50
 
     space_filling_latin_hyper_cube(n_points, n_vars, pop, max_iter)

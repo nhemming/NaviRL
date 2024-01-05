@@ -12,6 +12,7 @@ from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.integrate import trapezoid
 from scipy.ndimage import uniform_filter1d
 from scipy.signal import savgol_filter
 import seaborn as sns
@@ -164,12 +165,42 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
     # save the data
     df_avg.to_csv(os.path.join(base_dir,'OverallResults.csv'),index=False)
 
+    # build aggregate metrics
+    if len(df_avg) == 1:
+        aoc = float(df_avg['success'].iloc[0])
+    else:
+        aoc = trapezoid(y=df_avg['success'], x=df_avg['ep_num'])
+    min_norm_dst_travel = df_avg['normalized_distance_traveled'].min()
+    success = list(df_avg['success'])
+
+    window = 0
+    max_window = 0
+    for i, s in enumerate(success):
+
+        if not np.abs(s - 1.0) < 1e-5:
+            # update window
+            window = 0
+        else:
+            window += 1
+
+        if window > max_window:
+            max_window = window
+    longest_success_rate = max_window
+
+    aggregate_dict_0 = {'name': 'AOC', 'value':aoc }
+    aggregate_dict_1 = {'name': 'min_norm_dst_travel', 'value': min_norm_dst_travel}
+    aggregate_dict_2 = {'name': 'longest_success_rate', 'value': longest_success_rate}
+    agg_lst = [aggregate_dict_0, aggregate_dict_1, aggregate_dict_2]
+
+    df_agg = pd.DataFrame(agg_lst)
+    df_agg.to_csv(os.path.join(base_dir,'AggregateResults.csv'),index=False)
+
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_non_learning'
-    set_name = 'DebugRRT'
-    trial_num = 0
+    base_folder = 'demo_to_test_hparam_opt'
+    set_name = 'DebugHPOptPRM'
+    trial_num = 14
     eval_trial_num = 0
 
     """

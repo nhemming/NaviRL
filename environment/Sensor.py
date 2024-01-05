@@ -423,7 +423,10 @@ class DestinationRRTStarSensor(Sensor):
         self.vertices = []  # list of the vertices in the graph
         self.link_dst = link_dst
         self.n_samples = n_samples
-        self.neighbor_radius = neighbor_radius
+        if neighbor_radius <= link_dst:
+            self.neighbor_radius = link_dst*2.0
+        else:
+            self.neighbor_radius = neighbor_radius
         self.trans_dst = trans_dst  # distance to subgoal to achieve before moving to the next subgoal
         self.sample_domain = sample_domain # euclidean distance around owner entity to draw samples from for building the PRM
         self.model_path = model_path
@@ -431,6 +434,7 @@ class DestinationRRTStarSensor(Sensor):
         self.use_simple_model = True if model_radius is not None else False
         self.last_reset_time = -np.infty  # [s]
         self.graph_frequency = graph_frequency
+
 
         # TODO enaable methodology for a surrogate transition model for the entity that owns this sensor
 
