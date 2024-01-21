@@ -272,7 +272,8 @@ def space_filling_latin_hyper_cube(n_points,n_vars, pop_size, max_iter):
     lhs_plan, order = mmsort(n_points, lhs_plans,p)
 
     # save the lhs
-    df = pd.DataFrame(data=lhs_plan)
+    cols = ['x'+str(i) for i in range(n_vars)]
+    df = pd.DataFrame(data=lhs_plan,columns=cols)
     df.to_csv('Npoints-' + str(n_points) + '_Nvars-' + str(n_vars)+'_sflhs.csv',index=False)
 
     if len(lhs_plan[0,:]) == 2:
@@ -288,9 +289,9 @@ def space_filling_latin_hyper_cube(n_points,n_vars, pop_size, max_iter):
 
 if __name__ == '__main__':
 
-    n_points = 10
+    n_points = 20
     n_vars = 2
     pop = 100
-    max_iter = 50
+    max_iter = 500
 
     space_filling_latin_hyper_cube(n_points, n_vars, pop, max_iter)

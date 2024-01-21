@@ -198,9 +198,9 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_hparam_opt'
-    set_name = 'DebugHPOptPRM'
-    trial_num = 14
+    base_folder = 'demo_to_test_non_learning'
+    set_name = 'DebugRRT'
+    trial_num = 2
     eval_trial_num = 0
 
     """
@@ -209,5 +209,3 @@ if __name__ == '__main__':
 
     # extract data
     extract_data(base_folder, set_name, trial_num, eval_trial_num)
-
-    # combine data that needs to be combined

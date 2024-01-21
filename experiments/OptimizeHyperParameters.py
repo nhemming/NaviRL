@@ -35,6 +35,7 @@ import yaml
 
 # own modules
 from analysis.ExtractEvalData import extract_data
+from analysis.ExtractTraingingData import extract_data
 from environment.NavigationEnvironment import NavigationEnvironment
 from utilities.GenerateSFLHS import space_filling_latin_hyper_cube
 
@@ -54,6 +55,9 @@ def train_and_eval(set_name,input_file_name, eval_input_file_name):
 
     # run the training. This call isn't actually training, but running an episode to setup the enviornment for evaluation
     env.train_agent() # TODO remove comment
+
+    # extract the trainging progress data
+    extract_data(base_folder, set_name, trial_num)
 
     # run the evaluation script
     env.build_eval_env_from_yaml(eval_input_file_name, cur_dir)
@@ -520,7 +524,7 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
 
     # run simulation for optimal AOC set
     # change the input files to use the variables called out in the DOE
-    sim_def, eval_sim_def = edit_simulation_definition_files(sim_def_file, eval_sim_def_file, set_name, len(df_results), curr_best_settings_aoc)
+    sim_def, eval_sim_def = edit_simulation_definition_files(sim_def_file, eval_sim_def_file, set_name, len(df_results)+1, curr_best_settings_aoc)
 
     # launch training and evaluatiuon of the agent
     base_folder, trial_num, eval_trial_num = train_and_eval(set_name, sim_def_file, eval_sim_def_file)
@@ -565,19 +569,20 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
 if __name__ == '__main__':
 
     # definition of the hyper parameters
-    set_name = 'demo_to_test_2Dhparam_opt'
-    sim_def_file_name = 'experiment_setup_RRTStar.yaml'
+    set_name = 'demo_to_test_hparam_DDPG_bspline'
+    sim_def_file_name = 'experiment_setup_DDPG_bspline_control.yaml'
     eval_sim_def_file_name = 'no_obstacle_mass_free_evaluation_set.yaml'
     hp_vars_dict = OrderedDict()
 
-    hp_0 = {'name': 'Sensors;sensor1;n_samples','min':100,'max':1000,'type':'int'}
+    hp_0 = {'name': 'LearningAgent;LearningAlgorithm;alg0;batch_size','min':32,'max':1024,'type':'int'}
     hp_vars_dict[hp_0['name']] = hp_0
 
-    hp_1 = {'name': 'Sensors;sensor1;link_dst', 'min': 0.3, 'max': 2.5,'type':'float'} # 0.5 default
+    hp_1 = {'name': 'LearningAgent;LearningAlgorithm;alg0;num_batches', 'min': 8, 'max': 128,'type':'int'} # 0.5 default
     hp_vars_dict[hp_1['name']] = hp_1
 
     # number of initial doe samples
     doe_hp = {'n_points' : 20}
+
 
     # number of infill searches. Note the number of infill points will be double this value
     n_infill = 10
