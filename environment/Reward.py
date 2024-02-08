@@ -130,7 +130,7 @@ class ReachDestinationReward(RewardComponent):
 
             curr_dst = sensors[self.destination_sensor].state_dict['distance']
 
-            if curr_dst <= self.goal_dst:
+            if curr_dst <= self.goal_dst + 0.05:
 
                 reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
 

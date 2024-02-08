@@ -37,9 +37,9 @@ def load_environment(base_folder, set_name, trial_num):
 def main():
 
     # set experiments to evaluate
-    base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGRLPRM'
-    trial_num = 10
+    base_folder = 'demo_to_test_boat_DDPG'
+    set_name = 'DebugDDPGBSpline'
+    trial_num = 1006
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)

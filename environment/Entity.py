@@ -241,7 +241,7 @@ class CollideEntity(Entity):
     def reset_base(self):
         self.state_dict['is_collided'] = False
         self.history = []
-        self.reset()
+        #self.reset() # TODO not sure if this should be called here
 
 
 class CollisionShape(ABC):

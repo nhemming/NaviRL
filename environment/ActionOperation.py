@@ -171,7 +171,7 @@ class BSplineControl(ActionOperation):
                 cp_angle[i + 1] = cp_angle[i] + path_angles[i + 1]
 
         samples = self.bezier_curve(control_points, self.n_samples)
-        return samples
+        return samples, control_points
 
     def bernstein_poly(self, i, n, t):
         """
@@ -244,7 +244,7 @@ class BSplineControl(ActionOperation):
             path_angles = self.action_options[action_vector]
 
         # build the b spline curve. from the called out angles
-        self.samples = self.build_spline_from_angles(path_angles)
+        self.samples, _ = self.build_spline_from_angles(path_angles)
 
         presistentInfo = OrderedDict()
         presistentInfo['x_init'] = self.start_location[0]
@@ -291,9 +291,9 @@ class BSplineControl(ActionOperation):
                 # discrete
                 path_angles = self.action_options[path_angles]
 
-            samples = self.build_spline_from_angles(path_angles)
-
-            ax.plot(samples[:,0], samples[:,1], 'o--', color='gray')
+            samples, cps = self.build_spline_from_angles(path_angles)
+            ax.plot(cps[:,0],cps[:,1],'x',color='red',alpha=0.8)
+            ax.plot(samples[:,0], samples[:,1], 'o--', color='gray',alpha=0.3)
 
 
 class DubinsControl(ActionOperation):

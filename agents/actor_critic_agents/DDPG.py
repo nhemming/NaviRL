@@ -68,7 +68,7 @@ class DDPG(BaseLearningAlgorithm):
         action_operation.prep_state_action(entities,sensors,sim_time )
     '''
 
-    def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
+    def create_state_action(self, delta_t, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
         """
         parses the current state of the simulation to build the state required for the agent.
         :param action_operation:
@@ -80,8 +80,12 @@ class DDPG(BaseLearningAlgorithm):
         :return:
         """
 
+        # TODO remove after debugging
+        if (sim_time > 19.0 and sim_time <= 20.1) or (sim_time > 39.0 and sim_time <= 40.1) or (sim_time > 59.0 and sim_time <= 60.1) or (sim_time > 79.0 and sim_time <= 80.1) or (sim_time > 99.0 and sim_time <= 100.1):
+            x = 0
+
         # determine if new action shall be determined. If so set is_new_action to true
-        if sim_time - self.last_reset_time >= action_operation.frequency:
+        if np.abs(sim_time - self.last_reset_time)+delta_t/2.0 >= action_operation.frequency:
 
             self.last_reset_time = sim_time
 
@@ -105,6 +109,8 @@ class DDPG(BaseLearningAlgorithm):
             mutated_action = None
             if use_exploration:
                 mutated_action = self.exploration_strategy.add_perturbation(raw_action, ep_num)
+            else:
+                mutated_action = copy.deepcopy(raw_action)
 
             # partial log own data (input, raw output, perturbed output)
             self.action_info = {'raw_action':raw_action, 'mutated_action': mutated_action, 'q_values': critic_values}
@@ -120,7 +126,6 @@ class DDPG(BaseLearningAlgorithm):
             loss_save_critic = np.zeros(self.num_batches)
             for i in range(self.num_batches):
                 states, actions, rewards, next_states, dones = self.replay_buffer.sample(self.batch_size)
-
 
                 # update the critic
                 actions_next = self.forward_actor_target(next_states) #self.actor_target_network(next_states)
@@ -174,10 +179,10 @@ class DDPG(BaseLearningAlgorithm):
             if ep_num % self.save_rate == 0:
                 self.save_model(ep_num, file_path)
 
-    def update_memory(self, action_operation, done, entities, reward, sensors, sim_time):
+    def update_memory(self, delta_t, action_operation, done, entities, reward, sensors, sim_time):
 
         # if is_new_action == True save data, else don't save the data
-        if sim_time - self.last_reset_time >= action_operation.frequency or done:
+        if np.abs(sim_time - self.last_reset_time)+delta_t/2.0 >= action_operation.frequency or done:
             self.state_info['norm_next_state'], self.state_info['next_state'] = self.normalize_state( entities, sensors)
 
             self.replay_buffer.add_experience(self.state_info['norm_state'], self.action_info['mutated_action'], reward, self.state_info['norm_next_state'], done)

@@ -52,13 +52,13 @@ class BaseAgent(ABC):
         for name, value in self.learning_algorithms.items():
             value.prep_state_action(self.action_operation,entities,sensors, sim_time)
 
-    def create_state_action(self, entities, episode_num, sensors, sim_time, use_exploration):
+    def create_state_action(self, delta_t, entities, episode_num, sensors, sim_time, use_exploration):
         for name, value in self.learning_algorithms.items():
-            value.create_state_action(self.action_operation,entities, episode_num, sensors, sim_time, use_exploration)
+            value.create_state_action(delta_t, self.action_operation,entities, episode_num, sensors, sim_time, use_exploration)
 
-    def update_memory(self, tmp_done, entities, tmp_reward, sensors, sim_time):
+    def update_memory(self,delta_t, tmp_done, entities, tmp_reward, sensors, sim_time):
         for name, reward in tmp_reward.items():
-            self.learning_algorithms[name].update_memory(self.action_operation,tmp_done, entities, reward, sensors, sim_time)
+            self.learning_algorithms[name].update_memory(delta_t,self.action_operation,tmp_done, entities, reward, sensors, sim_time)
 
     def train(self, episode_num, file_path):
         for name, agent in self.learning_algorithms.items():

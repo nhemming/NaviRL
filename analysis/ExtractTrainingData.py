@@ -50,7 +50,7 @@ def load_environment(base_folder, set_name, trial_num):
     env.build_env_from_yaml(file_name,os.getcwd(), create=False) # TODO investigate correct input dir
     return env
 
-def extract_data(base_folder, set_name, trial_num):
+def extract_train_data(base_folder, set_name, trial_num):
     """
     marches through the output files from a learning trial and saves the learning efficiency capabilities
 
@@ -182,12 +182,12 @@ def extract_data(base_folder, set_name, trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_DDPG'
-    set_name = 'DebugDDPGRLPRM'
-    trial_num = 0
+    base_folder = 'demo_to_test_boat_DDPG'
+    set_name = 'DebugDDPGBSpline'
+    trial_num = 9
 
     """
     Edit above ^^
     """
 
-    extract_data(base_folder, set_name, trial_num)
+    extract_train_data(base_folder, set_name, trial_num)

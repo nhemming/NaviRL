@@ -145,7 +145,7 @@ class AnimateEpisode:
 
         self.k = 0
         Writer = animation.writers['ffmpeg']
-        writer = Writer(fps=5, metadata=dict(artist='Nathan'), bitrate=1800)
+        writer = Writer(fps=30, metadata=dict(artist='Nathan'), bitrate=1800)
 
         self.save_path = save_path
 
@@ -229,7 +229,7 @@ class AnimateEpisode:
 
         # create the video
         n_steps = len(frames[list(frames.keys())[0]])-1
-        ani = animation.FuncAnimation(fig, animate, frames=n_steps, interval=200, blit=False)
+        ani = animation.FuncAnimation(fig, animate, frames=n_steps, interval=20, blit=False)
 
         # save the video
         ani.save(self.save_path, writer=writer)
@@ -237,11 +237,11 @@ class AnimateEpisode:
 def main():
 
     # set experiments to evaluate
-    base_folder = 'demo_to_test_non_learning'
-    set_name = 'DebugRRT'
-    trial_num = 2
-    ep_num_vec = range(0,10)
-    create_video = True
+    base_folder = 'demo_to_test_boat_DDPG'
+    set_name = 'DebugDDPGBSpline'
+    trial_num = 1005
+    ep_num_vec = range(5700,6000)
+    create_video = False
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')
     base_dir = os.path.join(abs_path,base_folder)

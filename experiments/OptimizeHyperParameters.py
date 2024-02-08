@@ -35,7 +35,7 @@ import yaml
 
 # own modules
 from analysis.ExtractEvalData import extract_data
-from analysis.ExtractTraingingData import extract_data
+from analysis.ExtractTrainingData import extract_train_data
 from environment.NavigationEnvironment import NavigationEnvironment
 from utilities.GenerateSFLHS import space_filling_latin_hyper_cube
 
@@ -57,7 +57,7 @@ def train_and_eval(set_name,input_file_name, eval_input_file_name):
     env.train_agent() # TODO remove comment
 
     # extract the trainging progress data
-    extract_data(base_folder, set_name, trial_num)
+    extract_train_data(set_name, base_folder, trial_num)
 
     # run the evaluation script
     env.build_eval_env_from_yaml(eval_input_file_name, cur_dir)
@@ -85,17 +85,32 @@ def edit_simulation_definition_files(sim_def_file,eval_sim_def_file, set_name, i
     i = 0
     # loop over variables to change
     for name, value in hp_vars_dict.items():
-        tabs = name.split(';')
-        tmp_var = tabs.pop()
-        tmp_def = sim_def
-        for tab in tabs:
-            tmp_def = tmp_def[tab]
 
-        # convert from normalized DOE point to value in target domain
-        if value['type'] == 'int':
-            tmp_def[tmp_var] = int(row[i] * (value['max'] - value['min']) + value['min'])
-        elif value['type'] == 'float':
-            tmp_def[tmp_var] = float(row[i] * (value['max'] - value['min']) + value['min'])
+        if 'coincident' in name:
+            for n in value['name_lst']:
+                tabs = n.split(';')
+                tmp_var = tabs.pop()
+                tmp_def = sim_def
+                for tab in tabs:
+                    tmp_def = tmp_def[tab]
+
+                # convert from normalized DOE point to value in target domain
+                if value['type'] == 'int':
+                    tmp_def[tmp_var] = int(row[i] * (value['max'] - value['min']) + value['min'])
+                elif value['type'] == 'float':
+                    tmp_def[tmp_var] = float(row[i] * (value['max'] - value['min']) + value['min'])
+        else:
+            tabs = name.split(';')
+            tmp_var = tabs.pop()
+            tmp_def = sim_def
+            for tab in tabs:
+                tmp_def = tmp_def[tab]
+
+            # convert from normalized DOE point to value in target domain
+            if value['type'] == 'int':
+                tmp_def[tmp_var] = int(row[i] * (value['max'] - value['min']) + value['min'])
+            elif value['type'] == 'float':
+                tmp_def[tmp_var] = float(row[i] * (value['max'] - value['min']) + value['min'])
 
         i += 1
 
@@ -149,6 +164,7 @@ def add_metrics_to_file(sim_def, results_file_name, agg_df, idx, row, is_infill)
 
     df_results = pd.concat((df_results, df_tmp))
     df_results.to_csv(results_file_name, index=False)
+
 
 def graph_model(model, n_dim, train_x, train_y, max_ei, model_num, model_name, isOutFlipped, base_path):
 
@@ -246,6 +262,7 @@ def graph_model(model, n_dim, train_x, train_y, max_ei, model_num, model_name, i
             plt.tight_layout()
             plt.savefig(os.path.join(base_path,str(model_name)+'_'+str(model_num)+'.png'))
             plt.close()
+
 
 def build_krig(x,y, hp_dict):
     """
@@ -458,6 +475,8 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
         inp_names = [i+':norm' for i in hp_vars_dict.keys()]
         train_x = df_results[inp_names].to_numpy()
         train_y = -1.0*df_results['AOC [t-]'].to_numpy() # make trainy negative because we want to maximize the data
+        # normalize the AOC training data
+        train_y = train_y/max(train_y)
         krig_aoc = build_krig(train_x, train_y, krig_hp)
 
         # get point of maximum expectation for AOC model
@@ -512,6 +531,8 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
     inp_names = [i + ':norm' for i in hp_vars_dict.keys()]
     train_x = df_results[inp_names].to_numpy()
     train_y = -1.0*df_results['AOC [t-]'].to_numpy() # max negative as we are maximizing
+    # normalize the output data for AOC.
+    train_y = train_y / max(train_y)
     krig_aoc = build_krig(train_x, train_y, krig_hp)
 
     # get point of maximum expectation for AOC model
@@ -569,7 +590,7 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
 if __name__ == '__main__':
 
     # definition of the hyper parameters
-    set_name = 'demo_to_test_hparam_DDPG_bspline'
+    set_name = 'demo_to_test_3dhparam_opt'
     sim_def_file_name = 'experiment_setup_DDPG_bspline_control.yaml'
     eval_sim_def_file_name = 'no_obstacle_mass_free_evaluation_set.yaml'
     hp_vars_dict = OrderedDict()
@@ -579,6 +600,13 @@ if __name__ == '__main__':
 
     hp_1 = {'name': 'LearningAgent;LearningAlgorithm;alg0;num_batches', 'min': 8, 'max': 128,'type':'int'} # 0.5 default
     hp_vars_dict[hp_1['name']] = hp_1
+
+    hp_2 = {'name': 'coincident0', 'name_lst': ['LearningAgent;LearningAlgorithm;alg0;NetworkActor;head0;hidden_layers',
+                                               'LearningAgent;LearningAlgorithm;alg0;NetworkActor;tail;hidden_layers',
+                                               'LearningAgent;LearningAlgorithm;alg0;NetworkCritic;head0;hidden_layers',
+                                               'LearningAgent;LearningAlgorithm;alg0;NetworkCritic;tail;hidden_layers']
+        , 'min': 8, 'max': 128, 'type': 'int'}
+    hp_vars_dict[hp_2['name']] = hp_2
 
     # number of initial doe samples
     doe_hp = {'n_points' : 20}

@@ -54,7 +54,7 @@ class BaseLearningAlgorithm(ABC):
         pass
 
     @abstractmethod
-    def update_memory(self, action_operation, done, entities, reward, sensors, sim_time):
+    def update_memory(self, delta_t, action_operation, done, entities, reward, sensors, sim_time):
 
         # if is_new_action == True save data, else don't save the data
 
@@ -101,7 +101,9 @@ class BaseLearningAlgorithm(ABC):
                 item = entities.get(row['name'],None)
                 if item is None:
                     item = sensors.get(row['name'],None)
-                norm_state[index] = ((item.state_dict[row['data']]-row['min']) / (row['max'] - row['min'])) * (row['norm_max']-row['norm_min']) + row['norm_min']
+                norm_raw = ((item.state_dict[row['data']]-row['min']) / (row['max'] - row['min'])) * (row['norm_max']-row['norm_min']) + row['norm_min']
+
+                norm_state[index] = norm_raw
                 state[index] = item.state_dict[row['data']]
             norm_state_dict[head_name] = norm_state
             state_dict[head_name] = state

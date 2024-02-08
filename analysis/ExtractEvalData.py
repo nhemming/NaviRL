@@ -75,6 +75,8 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
     for ic_num in range(env.eval_set_size):
     #for ic_num in range(16,20):
 
+        print("Extracting IC : {:d}".format(ic_num))
+
         cols = ['ep_num','success','crashed','distance_traveled[m]','normalized_distance_traveled']#,'amount_of_data_seen','amount_of_data_trained']
         df_ic = pd.DataFrame(data=np.zeros((len(env.model_nums),len(cols))),columns=cols)
 
@@ -198,9 +200,9 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_non_learning'
-    set_name = 'DebugRRT'
-    trial_num = 2
+    base_folder = 'demo_to_test_boat_DDPG'
+    set_name = 'DebugDDPGBSpline'
+    trial_num = 9
     eval_trial_num = 0
 
     """

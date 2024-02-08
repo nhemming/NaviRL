@@ -1,0 +1,191 @@
+Entities:
+  RiverBoatEntity:
+    name: learning_entity
+    id: 0
+    collision_object: # this if overwritten by default values
+      type: rectangle
+      height: 4.0  # [m]
+      width: 10.0  # [m]
+  StaticEntity:
+    name: destination
+    id: 1
+    collision_object: # no collision is actually here. Just used for rendering.
+      type: circle
+      radius: 5.0 # [m]
+Environment:
+  domain:
+    min_x: 0 # [m]
+    max_x: 200 # [m]
+    min_y: 0 # [m]
+    max_y: 200 # [m]
+    buffer: 0.5 # [m]
+  time_step: 0.1 # [s]
+ExplorationStrategies:
+  strategy1:
+    name: EpsilonGreedy_0
+    distribution: # mean, std of each action variable
+      dist0: 0.0,0.1
+      dist1: 0.0,0.1
+      dist2: 0.0,0.1
+    threshold_schedule:
+      point0: 0,0.9 # x point, threshold for if a random number is added
+      point1: 8000,0.2
+    type: EpsilonGreedy
+LearningAgent:
+  name: general_nav_0
+  save_rate: 100
+  type: SingleLearningAlgorithmAgent
+  ActionOperation:
+    alg_name: basic_control
+    frequency: 20.0 # [s]
+    is_continuous: True
+    name: bspline_control
+
+    # discreet solution
+    number_controls: 1 # [-]
+    segment_length: 30.0
+    target_entity: learning_entity
+    controller:
+      type: pd
+      p: 0.1
+      d: 0.5
+
+    # used to describe the options available for the discrete case and the bounds for each action
+    # in the continuous actions.
+    action_options:
+      option0: -1.0471975511965976,1.0471975511965976 #-0.392699082,0.392699082  # minimum and maximum
+      option1: -1.0471975511965976,1.0471975511965976
+      option2: -1.0471975511965976,1.0471975511965976
+
+  ControlledEntity: learning_entity
+  device: cuda
+  LearningAlgorithm:
+    alg0:
+      batch_size: 512
+      exploration_strategy: EpsilonGreedy_0
+      gamma: 0.9
+      name: DDPG_0
+      num_batches: 32
+      target_update_rate: 50
+      tau: 0.05
+      type: DDPG
+      Input:
+        head0:
+          item0:
+            name: learning_entity
+            data: phi # heading
+            min: 0 # [rad]
+            max: 6.283185307179586 # [rad]
+            norm_min: -1 # [-]
+            norm_max: 1 # [-]
+          item1:
+            name: destination_sensor_0
+            data: angle
+            min: -3.14159265359 # [rad]
+            max: 3.14159265359 # [rad]
+            norm_min: 0 # [-] # TODO try -1 again
+            norm_max: 1 # [-]
+          item2:
+            name: destination_sensor_0
+            data: distance
+            min: 0 # [m]
+            max: 150 # [m]
+            norm_min: 0 # [-]  # maybe use -1
+            norm_max: 1 # [-]
+      NetworkActor:
+        initializer: xavier
+        head0:
+          #batch_norm: False
+          dropout: 0.0 # [-]
+          hidden_activation: relu
+          hidden_layers: 32 # 64,64
+        tail:
+          #batch_norm: False
+          dropout: 0.0
+          hidden_activation: relu
+          hidden_layers: 32
+          last_activation: tanh
+          # only needed for continuous case
+          #output_range: -1,1 # [-]
+      NetworkCritic:
+        initializer: xavier
+        head0:
+          #batch_norm: False
+          dropout: 0.0 # [-]
+          hidden_activation: relu
+          hidden_layers: 32 # 64,64
+        tail:
+          #batch_norm: False
+          dropout: 0.0
+          hidden_activation: relu
+          hidden_layers: 32
+          last_activation: none
+          # only needed for continuous case
+          #output_range: -1,1 # [-]
+      Optimizer:
+        beta1: 0.9
+        beta2: 0.999
+        learning_agent: DDPG_0
+        lr: 0.001
+        name: adam_0
+        type: adam
+      ReplayBuffer:
+        buffer_size: 131584
+        type: vanilla
+  
+MetaData:
+  num_episodes: 10001
+  seed: 0
+  set: DebugDDPGBSpline
+  training_sim_time: 161.0
+  trial_num: 9
+
+RewardDefinition:
+  component0:
+    adj_factor: 1.0
+    destination_sensor: destination_sensor_0
+    goal_dst: 5.0
+    reward: 2.0
+    target_agent: general_nav_0
+    target_lrn_alg: DDPG_0
+    type: reach_destination
+  component1:
+    adj_factor: 0.01
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DDPG_0
+    type: heading_improvement
+  component2:
+    adj_factor: 0.1
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DDPG_0
+    type: close_distance
+  component3:
+    adj_factor: 0.01
+    aligned_angle: 0.087264
+    aligned_reward: 1.0
+    destination_sensor: destination_sensor_0
+    target_agent: general_nav_0
+    target_lrn_alg: DDPG_0
+    type: aligned_heading
+  overall_adj_factor: 1.0
+Sensors:
+  sensor0:
+    type: destination_sensor
+    name: destination_sensor_0
+    id: 0
+    owner: learning_entity
+    target: destination
+    max_dst: 150 # [m]
+TerminationDefinition:
+  component0:
+    destination_sensor: destination_sensor_0
+    goal_dst: 5.0
+    name: reach_destination_0
+    target_agent: general_nav_0
+    type: reach_destination
+  component1:
+    name: any_collisions_0
+    target_agent: general_nav_0
+    type: any_collisions

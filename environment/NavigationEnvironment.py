@@ -20,6 +20,7 @@ from agents.NoLearning import NoLearning
 from agents.actor_critic_agents.DDPG import DDPG
 from agents.DQN_agents.DQN import DQN
 from environment.MassFreeVectorEntity import MassFreeVectorEntity
+from environment.RiverBoat import RiverBoatEntity
 from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
 from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
@@ -60,7 +61,7 @@ class NavigationEnvironment:
 
         # minimum distance all entities in the simulation must be apart in the reset function.
         # TODO should be loaded from file not hard coded
-        self.reset_seperation_dst = 2
+        self.reset_seperation_dst = 30
 
         # save a dictionary of pandas data frames holding the initial conditions of the entities in the simulation
         self.init_conditions_dict = dict()
@@ -260,6 +261,10 @@ class NavigationEnvironment:
                 # create a basic agent and add it to the entity list
                 ba = MassFreeVectorEntity(collision_shape, item['id'], item['name'])
                 self.entities[ba.name] = ba
+            elif value == 'RiverBoatEntity':
+                # create a river boat entity using default values
+                rb = RiverBoatEntity.get_default(item['id'], item['name'])
+                self.entities[rb.name] = rb
             elif value == 'StaticEntity':
                 se = StaticEntity(item['id'],item['name'], collision_shape)
                 self.entities[se.name] = se
@@ -279,7 +284,7 @@ class NavigationEnvironment:
 
         for value, item in self.h_params['Sensors'].items():
             if item['type'] == 'destination_sensor':
-                ds = DestinationSensor(item['id'], item['name'], item['owner'], item['target'])
+                ds = DestinationSensor(item['id'], item['max_dst'], item['name'], item['owner'], item['target'])
                 self.sensors[ds.name] = ds
             elif item['type'] == 'destination_prm_sensor':
 
@@ -581,7 +586,7 @@ class NavigationEnvironment:
         done = False # false if the simulation is still active
 
         # call the reset methods for everything
-        # reset the simulation
+        # reset the simulation. Also resets the entities
         if is_training:
             self.reset()
         else:
@@ -591,6 +596,7 @@ class NavigationEnvironment:
         for name, tmp_agent in self.agents.items():
             tmp_agent.reset()
 
+        # Don't reset here because the training environment reset function does this
         # entity reset function
         for name, tmp_entity in self.entities.items():
             tmp_entity.reset_base()
@@ -621,7 +627,7 @@ class NavigationEnvironment:
             # loop over agents both learning and non-learning
             # select action -> state_dict, action_dict
             for name, tmp_agent in self.agents.items():
-                tmp_agent.create_state_action(self.entities, episode_num, self.sensors, sim_time, use_exploration)
+                tmp_agent.create_state_action(self.delta_t,self.entities, episode_num, self.sensors, sim_time, use_exploration)
 
             # convert action and apply the change
             for name, tmp_agent in self.agents.items():
@@ -657,7 +663,7 @@ class NavigationEnvironment:
             for name, value in self.agents.items():
                 tmp_reward = reward[name]
                 tmp_done = done_dict[name]
-                value.update_memory(tmp_done, self.entities, tmp_reward,self.sensors,sim_time)
+                value.update_memory(self.delta_t,tmp_done, self.entities, tmp_reward,self.sensors,sim_time)
 
                 # ask agent if reward functions need to be reset ?
                 for tmp_name, tmp_value in self.reward_function.reward_components.items():
@@ -701,6 +707,9 @@ class NavigationEnvironment:
         new_loc_lst = []
         for name, value in self.entities.items():
 
+            # each entity should have its own reset function
+            value.reset_random()  # TODO verify the reset random is required. I think it is.
+
             min_dst = 0
             new_x = 0.0
             new_y = 0.0
@@ -714,15 +723,11 @@ class NavigationEnvironment:
                     if tmp_dst < min_dst:
                         min_dst = tmp_dst
 
-
             value.state_dict['x_pos'] = new_x
             value.state_dict['y_pos'] = new_y
 
             # save the new location of the entity
             new_loc_lst.append([new_x, new_y])
-
-            # each entity should have its own reset function
-            value.reset()
 
     def reset_eval(self, eval_ic_num):
         # reset the environment. Sensors do not have positions
@@ -773,7 +778,7 @@ class NavigationEnvironment:
                 # run simulation
                 history_path = os.path.join(self.output_dir, 'evaluation') # TODO figure out what to do
                 history_path = os.path.join(history_path, str(self.eval_trial_num))
-                self.run_simulation(model_num, history_path, self.max_eval_time, use_exploration=True, is_training=False, eval_ic_num=i)
+                self.run_simulation(model_num, history_path, self.max_eval_time, use_exploration=False, is_training=False, eval_ic_num=i)
 
     def set_random_seeds(self, random_seed):
         """Sets all possible random seeds so results can be reproduced"""
