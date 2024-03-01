@@ -223,6 +223,58 @@ class RiverBoatEntity(CollideEntity):
         # sets the disk area of the propeller counting the area of the spinner in the disk area [m]
         self.state_dict['prop_area'] = self.init_state_dict['prop_area']
 
+    def add_step_history(self, sim_time):
+        """
+        save the state information for the current time steo
+        :return:
+        """
+        self.state_dict['sim_time'] = sim_time
+
+        # don't save entire state dict
+
+        save_data = {
+            'sim_time' :self.state_dict['sim_time'],
+            'x_pos' :self.state_dict['x_pos'],
+            'y_pos' : self.state_dict['y_pos'],
+            'alpha': self.state_dict['alpha'],
+            'delta' : self.state_dict['delta'],
+            'is_collided' : self.state_dict['is_collided'],
+            'phi' : self.state_dict['phi'],
+            'theta' : self.state_dict['theta'],
+            'v_xp':self.state_dict['v_xp'],
+            'v_yp' : self.state_dict['v_yp'],
+            'v_x': self.state_dict['v_x'],
+            'v_y' : self.state_dict['v_y'],
+            'v_mag' : self.state_dict['v_mag'],
+            'phi_dot':self.state_dict['phi_dot'],
+            #'v_x_eff_air':self.state_dict['v_x_eff_air'],
+            #'v_y_eff_airself': self.state_dict['v_y_eff_air'],
+            #'v_x_eff_water':self.state_dict['v_x_eff_water'],
+            #'v_y_eff_water':self.state_dict['v_y_eff_water']
+            'acc_xp':self.state_dict['acc_xp'],
+            'acc_yp':self.state_dict['acc_yp'],
+            'acc_x':self.state_dict['acc_x'],
+            'acc_y':self.state_dict['acc_y'],
+            'phi_double_dot':self.state_dict['phi_double_dot'],
+            'thrust':self.state_dict['thrust'],
+            #'v_wind':self.state_dict['v_wind'],
+            #'v_current':self.state_dict['v_current'],
+            'f_d_air':self.state_dict['f_d_air'],
+            'f_s_air':self.state_dict['f_s_air'],
+            'f_s_water':self.state_dict['f_s_water'],
+            'f_d_water':self.state_dict['f_d_water'],
+            'fx_p':self.state_dict['fx_p'],
+            'fy_p':self.state_dict['fy_p'],
+            'm_air':self.state_dict['m_air'],
+            'm_water':self.state_dict['m_water'],
+            'mr':self.state_dict['mr'],
+            'my_p':self.state_dict['my_p'],
+            'hull_length':self.state_dict['hull_length'],
+            'hull_width': self.state_dict['hull_width']
+        }
+
+        self.history.append(save_data)
+
     def step(self, delta_t):
         """
         Use Euler stepping to step the entity one step in time.
@@ -738,7 +790,7 @@ class RiverBoatEntity(CollideEntity):
             for j, vx in enumerate(v_test_x):
                 self.thrust_map[i,j] = self.non_axial_momentum([vx,v_test_y],0.0, alpha)
 
-    def set_control(self, power, propeller_angle):
+    def set_control(self, power, propeller_angle_change):
         """
         Changes the heading (phi) of the entity by the passed in amount.
         :param phi_adj: The amount [rad] to change the heading.
@@ -747,8 +799,8 @@ class RiverBoatEntity(CollideEntity):
 
         if isinstance(power,np.ndarray):
             power = power[0]
-        if isinstance(propeller_angle,np.ndarray):
-            propeller_angle = propeller_angle[0]
+        if isinstance(propeller_angle_change,np.ndarray):
+            propeller_angle_change = propeller_angle_change[0]
 
         # check for bounds
         if power > self.state_dict['power_max']:
@@ -759,13 +811,13 @@ class RiverBoatEntity(CollideEntity):
             self.state_dict['power'] = power
 
         # check for bounds of the propeller angle
-        propeller_angle = self.state_dict['delta'] - propeller_angle
+        propeller_angle = self.state_dict['delta'] - propeller_angle_change
         if propeller_angle < self.state_dict['delta_max'][0]:
             self.state_dict['delta'] = self.state_dict['delta_max'][0]
         elif propeller_angle > self.state_dict['delta_max'][1]:
             self.state_dict['delta'] = self.state_dict['delta_max'][1]
         else:
-            self.state_dict['delta'] =  propeller_angle
+            self.state_dict['delta'] = propeller_angle
 
     def get_aero_coeffs(self, x):
         """
@@ -867,8 +919,9 @@ class RiverBoatEntity(CollideEntity):
         self.initialize_in_state_dict()
 
         self.state_dict['phi'] = np.random.uniform(low=0, high=2.0 * np.pi)
+        self.state_dict['phi_dot'] = np.random.uniform(low=-0.2, high=0.2)
         self.state_dict['delta'] = np.random.uniform(low=self.state_dict['delta_max'][0], high=self.state_dict['delta_max'][1])
-        self.state_dict['v_xp'] = np.random.uniform(low=0.0,high=1.0)
+        self.state_dict['v_xp'] = np.random.uniform(low=0.0,high=2.0)
         self.state_dict['v_yp'] = np.random.uniform(low=-0.5, high=0.5)
         self.state_dict['v_mag'] = np.sqrt( self.state_dict['v_xp']*self.state_dict['v_xp'] + self.state_dict['v_yp']*self.state_dict['v_yp'] )
 

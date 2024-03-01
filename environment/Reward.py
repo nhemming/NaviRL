@@ -29,8 +29,9 @@ class RewardDefinition:
 
 class RewardComponent(ABC):
 
-    def __init__(self, adj_factor, name, target_agent, target_lrn_alg):
+    def __init__(self, adj_factor, delta_t, name, target_agent, target_lrn_alg):
         self.adj_factor = adj_factor
+        self.delta_t = delta_t
         self.name = name
         self.target_agent = target_agent
         self.target_lrn_alg = target_lrn_alg
@@ -40,8 +41,7 @@ class RewardComponent(ABC):
         pass
 
     def reset(self, entities, sensors, reward_agents):
-        # do nothing for default reset function
-        pass
+        reward_agents[self.target_agent][self.target_lrn_alg] = 0.0
 
     def get_key(self):
         return self.target_lrn_alg + ':' + self.target_agent
@@ -49,9 +49,9 @@ class RewardComponent(ABC):
 
 class AlignedHeadingReward(RewardComponent):
 
-    def __init__(self, adj_factor, aligned_angle, aligned_reward,  destination_sensor, target_agent,target_lrn_alg):
+    def __init__(self, adj_factor, aligned_angle, aligned_reward,delta_t,  destination_sensor, target_agent,target_lrn_alg):
         name = "Aligned_Heading_Reward"
-        super(AlignedHeadingReward, self).__init__(adj_factor, name, target_agent,target_lrn_alg)
+        super(AlignedHeadingReward, self).__init__(adj_factor, delta_t, name, target_agent,target_lrn_alg)
 
         self.aligned_angle = aligned_angle
         self.aligned_reward = aligned_reward
@@ -63,15 +63,15 @@ class AlignedHeadingReward(RewardComponent):
         heading_offset = sensors[self.destination_sensor].state_dict['angle']
 
         # reward for pointing entity near or directly at goal
-        if heading_offset <= self.aligned_angle:
+        if np.abs(heading_offset) <= self.aligned_angle:
             reward_agents[self.target_agent][self.target_lrn_alg] += self.aligned_reward*self.adj_factor
 
 
 class CloseDistanceReward(RewardComponent):
 
-    def __init__(self, adj_factor, destination_sensor, target_agent, target_lrn_alg):
+    def __init__(self, adj_factor,delta_t, destination_sensor, target_agent, target_lrn_alg):
         name = "Closer_To_Goal_Reward"
-        super(CloseDistanceReward, self).__init__(adj_factor, name, target_agent, target_lrn_alg)
+        super(CloseDistanceReward, self).__init__(adj_factor, delta_t,name, target_agent, target_lrn_alg)
 
         self.destination_sensor = destination_sensor
         self.old_dst = None
@@ -86,14 +86,16 @@ class CloseDistanceReward(RewardComponent):
         dst = sensors[self.destination_sensor].state_dict['distance']
 
         if self.old_dst > dst:
-            reward_agents[self.target_agent][self.target_lrn_alg] += (self.old_dst-dst)*self.adj_factor
+            reward_agents[self.target_agent][self.target_lrn_alg] += (self.old_dst-dst)/(1.0*self.delta_t)*self.adj_factor
+
+        self.old_dst = dst
 
 
 class ImproveHeadingReward(RewardComponent):
 
-    def __init__(self, adj_factor,  destination_sensor, target_agent, target_lrn_alg):
+    def __init__(self, adj_factor, delta_t, destination_sensor, target_agent, target_lrn_alg):
         name = "Improve_Heading_Reward"
-        super(ImproveHeadingReward, self).__init__(adj_factor, name, target_agent, target_lrn_alg)
+        super(ImproveHeadingReward, self).__init__(adj_factor,delta_t,name, target_agent, target_lrn_alg)
 
         self.destination_sensor = destination_sensor
         self.old_heading_offset = None
@@ -109,16 +111,17 @@ class ImproveHeadingReward(RewardComponent):
         # reward for improving heading
         delta_heading = np.abs(self.old_heading_offset) - np.abs(heading_offset)
         if delta_heading >= 0.0:
-            reward_agents[self.target_agent][self.target_lrn_alg] += delta_heading * self.adj_factor
+            #reward_agents[self.target_agent][self.target_lrn_alg] += delta_heading * self.adj_factor
+            reward_agents[self.target_agent][self.target_lrn_alg] += (np.pi - np.abs(heading_offset))**2 * self.adj_factor
 
         self.old_heading_offset = heading_offset
 
 
 class ReachDestinationReward(RewardComponent):
 
-    def __init__(self, adj_factor, destination_sensor, goal_dst, reward, target_agent, target_lrn_alg):
+    def __init__(self, adj_factor,delta_t, destination_sensor, goal_dst, reward, target_agent, target_lrn_alg):
         name = "Reach_Destination_Reward"
-        super(ReachDestinationReward, self).__init__(adj_factor, name, target_agent, target_lrn_alg)
+        super(ReachDestinationReward, self).__init__(adj_factor, delta_t,name, target_agent, target_lrn_alg)
         self.destination_sensor = destination_sensor
         self.goal_dst = goal_dst
         self.reward = reward
@@ -131,6 +134,29 @@ class ReachDestinationReward(RewardComponent):
             curr_dst = sensors[self.destination_sensor].state_dict['distance']
 
             if curr_dst <= self.goal_dst + 0.05:
+
+                reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
+
+    def reset(self,entities, sensors, reward_agents):
+        reward_agents[self.target_agent][self.target_lrn_alg] = 0.0
+
+class TooFarAwayReward(RewardComponent):
+
+    def __init__(self, adj_factor,delta_t, destination_sensor, max_dst, reward, target_agent, target_lrn_alg):
+        name = "Too_Far_Away_Reward"
+        super(TooFarAwayReward, self).__init__(adj_factor,delta_t, name, target_agent, target_lrn_alg)
+        self.destination_sensor = destination_sensor
+        self.max_dst = max_dst
+        self.reward = reward
+
+    def calculate_reward(self,sim_time,entities, sensors, reward_agents):
+
+        if sim_time > 1e-12:
+            # not allowed to recieve reward for being at the goal location at the intiailization of the simulation. Fix for sub desntionation based sensors
+
+            curr_dst = sensors[self.destination_sensor].state_dict['distance']
+
+            if curr_dst >= self.max_dst:
 
                 reward_agents[self.target_agent][self.target_lrn_alg] += self.reward
 

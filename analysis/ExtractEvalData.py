@@ -200,9 +200,9 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_boat_DDPG'
-    set_name = 'DebugDDPGBSpline'
-    trial_num = 9
+    base_folder = 'tune_boat_dubins_DDPG'
+    set_name = 'DDPGDubins'
+    trial_num = 5
     eval_trial_num = 0
 
     """

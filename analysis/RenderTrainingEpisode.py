@@ -237,10 +237,10 @@ class AnimateEpisode:
 def main():
 
     # set experiments to evaluate
-    base_folder = 'demo_to_test_boat_DDPG'
-    set_name = 'DebugDDPGBSpline'
-    trial_num = 1005
-    ep_num_vec = range(5700,6000)
+    base_folder = 'tune_boat_vector_control_DDPG'
+    set_name = 'DDPGVector'
+    trial_num = 0
+    ep_num_vec = range(80,820)
     create_video = False
 
     abs_path = os.getcwd().replace('\\analysis','\\experiments')

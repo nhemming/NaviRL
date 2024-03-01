@@ -23,11 +23,11 @@ from environment.MassFreeVectorEntity import MassFreeVectorEntity
 from environment.RiverBoat import RiverBoatEntity
 from environment.Controller import PDController
 from environment.Entity import CollisionCircle, CollisionRectangle, get_collision_status
-from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward
+from environment.Reward import AlignedHeadingReward, CloseDistanceReward, ImproveHeadingReward, RewardDefinition, ReachDestinationReward, TooFarAwayReward
 from environment.Sensor import DestinationSensor, DestinationPRMSensor, DestinationRRTStarSensor
 from environment.StaticEntity import StaticEntity, StaticEntityCollide
 from exploration_strategies.EpsilonGreedy import EpsilonGreedy
-from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition
+from environment.Termination import AnyCollisionsTermination, ReachDestinationTermination, TerminationDefinition, TooFarAwayTermination
 from replay_buffer.ReplayBuffer import ReplayBuffer
 
 
@@ -525,17 +525,20 @@ class NavigationEnvironment:
             for name, value in rd.items():
                 if 'component' in name:
                     if value['type'] == 'aligned_heading':
-                        ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'],  value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        ahr = AlignedHeadingReward(value['adj_factor'], value['aligned_angle'], value['aligned_reward'], self.delta_t, value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                         self.reward_function.reward_components[ahr.name] = ahr
                     elif value['type'] == 'close_distance':
-                        cdr = CloseDistanceReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        cdr = CloseDistanceReward(value['adj_factor'], self.delta_t,value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                         self.reward_function.reward_components[cdr.name] = cdr
                     elif value['type'] == 'heading_improvement':
-                        ihr = ImproveHeadingReward(value['adj_factor'], value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
+                        ihr = ImproveHeadingReward(value['adj_factor'], self.delta_t,value['destination_sensor'], value['target_agent'], value['target_lrn_alg'])
                         self.reward_function.reward_components[ihr.name] = ihr
                     elif value['type'] == 'reach_destination':
-                        rdr = ReachDestinationReward(value['adj_factor'], value['destination_sensor'], value['goal_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
+                        rdr = ReachDestinationReward(value['adj_factor'], self.delta_t,value['destination_sensor'], value['goal_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
                         self.reward_function.reward_components[rdr.name] = rdr
+                    elif value['type'] == 'too_far_away':
+                        tfa = TooFarAwayReward(value['adj_factor'],self.delta_t, value['destination_sensor'], value['max_dst'], value['reward'], value['target_agent'], value['target_lrn_alg'])
+                        self.reward_function.reward_components[tfa.name] = tfa
                     else:
                         raise ValueError('Unsupported reward component')
 
@@ -552,6 +555,9 @@ class NavigationEnvironment:
             elif value['type'] == 'reach_destination':
                 self.termination_function.components[value['name']] = \
                     ReachDestinationTermination(value['destination_sensor'],value['goal_dst'],value['name'],value['target_agent'])
+            elif value['type'] == 'too_far_away':
+                self.termination_function.components[value['name']] = \
+                    TooFarAwayTermination(value['destination_sensor'],value['max_dst'],value['name'],value['target_agent'])
             else:
                 raise ValueError('Invalid termination function')
 
@@ -707,27 +713,35 @@ class NavigationEnvironment:
         new_loc_lst = []
         for name, value in self.entities.items():
 
-            # each entity should have its own reset function
-            value.reset_random()  # TODO verify the reset random is required. I think it is.
+            if name == 'destination':
+                new_x = 100.0
+                new_y = 100.0
+                value.state_dict['x_pos'] = new_x
+                value.state_dict['y_pos'] = new_y
+                new_loc_lst.append([new_x, new_y])
+            else:
 
-            min_dst = 0
-            new_x = 0.0
-            new_y = 0.0
-            while min_dst <= self.reset_seperation_dst:
+                # each entity should have its own reset function
+                value.reset_random()  # TODO verify the reset random is required. I think it is.
 
-                new_x = np.random.uniform(low=self.domain['min_x'], high=self.domain['max_x'])
-                new_y = np.random.uniform(low=self.domain['min_y'], high=self.domain['max_y'])
-                min_dst = np.inf
-                for loc in new_loc_lst:
-                    tmp_dst = np.sqrt( (new_x-loc[0])**2 + (new_y-loc[1])**2 )
-                    if tmp_dst < min_dst:
-                        min_dst = tmp_dst
+                min_dst = 0
+                new_x = 0.0
+                new_y = 0.0
+                while min_dst <= self.reset_seperation_dst:
 
-            value.state_dict['x_pos'] = new_x
-            value.state_dict['y_pos'] = new_y
+                    new_x = np.random.uniform(low=self.domain['min_x'], high=self.domain['max_x'])
+                    new_y = np.random.uniform(low=self.domain['min_y'], high=self.domain['max_y'])
+                    min_dst = np.inf
+                    for loc in new_loc_lst:
+                        tmp_dst = np.sqrt( (new_x-loc[0])**2 + (new_y-loc[1])**2 )
+                        if tmp_dst < min_dst:
+                            min_dst = tmp_dst
 
-            # save the new location of the entity
-            new_loc_lst.append([new_x, new_y])
+                value.state_dict['x_pos'] = new_x
+                value.state_dict['y_pos'] = new_y
+
+                # save the new location of the entity
+                new_loc_lst.append([new_x, new_y])
 
     def reset_eval(self, eval_ic_num):
         # reset the environment. Sensors do not have positions

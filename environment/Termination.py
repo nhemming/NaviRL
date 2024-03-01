@@ -76,3 +76,18 @@ class AnyCollisionsTermination(TerminationComponent):
                 if entity.state_dict['is_collided']:
                     done_agents[self.target_agent] = True
         done_agents[self.target_agent] = done_agents[self.target_agent] or False
+
+class TooFarAwayTermination(TerminationComponent):
+
+    def __init__(self, destination_sensor, max_dst, name, target_agent):
+        super(TooFarAwayTermination, self).__init__(name, target_agent)
+
+        self.destination_sensor = destination_sensor
+        self.max_dst = max_dst
+
+    def calculate_termination(self, entities, sensors, done_agents):
+
+        dst = sensors[self.destination_sensor].state_dict['distance']
+        if dst >= self.max_dst:
+            done_agents[self.target_agent] = True
+        done_agents[self.target_agent] = done_agents[self.target_agent] or False

@@ -1,7 +1,7 @@
 BaseExperiment:
   base_folder: demo_to_test_boat_DDPG
   set_name: DebugDDPGBSpline
-  trial_num: 9
+  trial_num: 13
 Entities:
   learning_entity:
     # list values to not use default values

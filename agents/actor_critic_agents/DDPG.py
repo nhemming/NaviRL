@@ -80,10 +80,6 @@ class DDPG(BaseLearningAlgorithm):
         :return:
         """
 
-        # TODO remove after debugging
-        if (sim_time > 19.0 and sim_time <= 20.1) or (sim_time > 39.0 and sim_time <= 40.1) or (sim_time > 59.0 and sim_time <= 60.1) or (sim_time > 79.0 and sim_time <= 80.1) or (sim_time > 99.0 and sim_time <= 100.1):
-            x = 0
-
         # determine if new action shall be determined. If so set is_new_action to true
         if np.abs(sim_time - self.last_reset_time)+delta_t/2.0 >= action_operation.frequency:
 

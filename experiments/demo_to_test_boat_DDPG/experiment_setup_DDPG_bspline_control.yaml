@@ -43,7 +43,7 @@ LearningAgent:
 
     # discreet solution
     number_controls: 1 # [-]
-    segment_length: 30.0
+    segment_length: 25.0
     target_entity: learning_entity
     controller:
       type: pd
@@ -53,9 +53,9 @@ LearningAgent:
     # used to describe the options available for the discrete case and the bounds for each action
     # in the continuous actions.
     action_options:
-      option0: -1.0471975511965976,1.0471975511965976 #-0.392699082,0.392699082  # minimum and maximum
-      option1: -1.0471975511965976,1.0471975511965976
-      option2: -1.0471975511965976,1.0471975511965976
+      option0:  -0.5235987755982988,0.5235987755982988 #  -1.0471975511965976,1.0471975511965976 : -0.392699082,0.392699082  # minimum and maximum
+      option1: -0.5235987755982988,0.5235987755982988
+      option2: -0.5235987755982988,0.5235987755982988
 
   ControlledEntity: learning_entity
   device: cuda
@@ -76,7 +76,7 @@ LearningAgent:
             data: phi # heading
             min: 0 # [rad]
             max: 6.283185307179586 # [rad]
-            norm_min: -1 # [-]
+            norm_min: 0 # [-]
             norm_max: 1 # [-]
           item1:
             name: destination_sensor_0
@@ -98,12 +98,12 @@ LearningAgent:
           #batch_norm: False
           dropout: 0.0 # [-]
           hidden_activation: relu
-          hidden_layers: 32 # 64,64
+          hidden_layers: 64 # 64,64
         tail:
           #batch_norm: False
           dropout: 0.0
           hidden_activation: relu
-          hidden_layers: 32
+          hidden_layers: 64
           last_activation: tanh
           # only needed for continuous case
           #output_range: -1,1 # [-]
@@ -113,12 +113,12 @@ LearningAgent:
           #batch_norm: False
           dropout: 0.0 # [-]
           hidden_activation: relu
-          hidden_layers: 32 # 64,64
+          hidden_layers: 64 # 64,64
         tail:
           #batch_norm: False
           dropout: 0.0
           hidden_activation: relu
-          hidden_layers: 32
+          hidden_layers: 64
           last_activation: none
           # only needed for continuous case
           #output_range: -1,1 # [-]
@@ -138,7 +138,7 @@ MetaData:
   seed: 0
   set: DebugDDPGBSpline
   training_sim_time: 161.0
-  trial_num: 9
+  trial_num: 13
 
 RewardDefinition:
   component0:
