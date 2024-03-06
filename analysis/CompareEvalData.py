@@ -341,94 +341,29 @@ if __name__ == '__main__':
     sets_to_compare = dict()
     include_training_data = False
 
-
     set_0 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
+        'base_folder': 'tune_boat_bspline_DQN',
+        'set_name': 'DQNBSpline',
         'trial_num': 0,
         'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins0'] = set_0
+    sets_to_compare['DQN_Bspline0'] = set_0
 
-    set_1 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1,
+    # DDPG vector control
+
+    set_1008 = {
+        'base_folder': 'tune_boat_vector_control_DDPG',
+        'set_name': 'DDPGVector',
+        'trial_num': 1008,
         'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1'] = set_1
+    sets_to_compare['DDPG_Vector1008'] = set_1008
 
+    # dubins selected solution
     set_2 = {
         'base_folder': 'tune_boat_dubins_DDPG',
         'set_name': 'DDPGDubins',
         'trial_num': 2,
         'eval_trial_num': 0}
     sets_to_compare['DDPG_Dubins2'] = set_2
-
-    set_3 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 3,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins3'] = set_3
-
-    set_4 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 4,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins4'] = set_4
-
-    set_5 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 5,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins5'] = set_5
-
-    set_1000 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1000,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1000'] = set_1000
-
-    set_1001 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1001,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1001'] = set_1001
-
-    '''
-    set_1002 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1002,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1002'] = set_1002
-    '''
-
-    set_1003 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1003,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1003'] = set_1003
-
-    '''
-    set_1004 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1004,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1004'] = set_1004
-    '''
-
-    set_1005 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 1005,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins1005'] = set_1005
 
     # bspline
     set_1011 = {

@@ -171,9 +171,9 @@ class DDPG(BaseLearningAlgorithm):
                                                      self.actor_network.parameters()):
                     target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
 
-            # check if model should be saved
-            if ep_num % self.save_rate == 0:
-                self.save_model(ep_num, file_path)
+        # check if model should be saved
+        if ep_num % self.save_rate == 0:
+            self.save_model(ep_num, file_path)
 
     def update_memory(self, delta_t, action_operation, done, entities, reward, sensors, sim_time):
 

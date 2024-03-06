@@ -913,6 +913,8 @@ class RiverBoatEntity(CollideEntity):
     def reset(self):
 
         self.initialize_in_state_dict()
+        self.state_dict['v_mag'] = np.sqrt(
+            self.state_dict['v_xp'] * self.state_dict['v_xp'] + self.state_dict['v_yp'] * self.state_dict['v_yp'])
 
     def reset_random(self):
         # reset the heading to a random vector

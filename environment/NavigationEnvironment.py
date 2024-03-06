@@ -411,6 +411,7 @@ class NavigationEnvironment:
                               optimizer_dict,
                               len(ao.action_options),
                               replay_buffer,
+                              self.h_params['LearningAgent']['save_rate'],
                               self.h_params['MetaData']['seed'])
                     agent.learning_algorithms[dqn.name] = dqn
 
@@ -758,6 +759,13 @@ class NavigationEnvironment:
 
                 value.state_dict[tmp_name] = float(tmp_value)
 
+            # TODO need post reset derived parameters update function for each entity
+            # bandaid
+            if isinstance(value,RiverBoatEntity):
+                value.state_dict['v_mag'] = np.sqrt(
+                    value.state_dict['v_xp'] * value.state_dict['v_xp'] + value.state_dict['v_yp'] * value.state_dict[
+                        'v_yp'])
+
 
     def set_collision_status(self):
         """
@@ -786,8 +794,6 @@ class NavigationEnvironment:
             for i in range(self.eval_set_size):
 
                 print("Episode Number:{:.0f}\tI.C. Number:{:.0f}".format(model_num,i))
-
-                # set current initial conditions maybe here.
 
                 # run simulation
                 history_path = os.path.join(self.output_dir, 'evaluation') # TODO figure out what to do

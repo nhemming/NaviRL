@@ -18,7 +18,7 @@ import torch
 
 class DQN(BaseLearningAlgorithm):
 
-    def __init__(self,device, exploration_strategy, general_params, name, network_description, observation_information, optimizer_dict, output_dim, replay_buffer, seed):
+    def __init__(self,device, exploration_strategy, general_params, name, network_description, observation_information, optimizer_dict, output_dim, replay_buffer, save_rate, seed):
 
         # device, exploration_strategy, general_params, name, observation_information
         super(DQN,self).__init__(device,exploration_strategy, general_params, name, observation_information)
@@ -40,10 +40,12 @@ class DQN(BaseLearningAlgorithm):
         self.last_target_update = -np.infty
         self.loss_header = "Episode_number,loss\n"
 
-    def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
+        self.save_rate = save_rate
+
+    def create_state_action(self, delta_t, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
 
         # determine if new action shall be determined. If so set is_new_action to true
-        if sim_time - self.last_reset_time >= action_operation.frequency:
+        if np.abs(sim_time - self.last_reset_time)+delta_t/2.0 >= action_operation.frequency:
 
             self.last_reset_time = sim_time
 
@@ -62,12 +64,14 @@ class DQN(BaseLearningAlgorithm):
             mutated_action = None
             if use_exploration:
                 mutated_action = self.exploration_strategy.add_perturbation(raw_action, ep_num)
+            else:
+                mutated_action = copy.deepcopy(raw_action)
 
             # partial log own data (input, raw output, perturbed output)
             self.action_info = {'raw_action':raw_action, 'mutated_action': mutated_action, 'q_values': q_values}
 
             # save information that it is persistent for the action operation until the next time an action is selected.
-            self.action_info['persistent_info'] = action_operation.setPersistentInfo(entities, sensors)
+            self.action_info['persistent_info'] = action_operation.setPersistentInfo(entities, sensors, mutated_action)
 
     def train(self, ep_num,file_path):
 
@@ -96,20 +100,28 @@ class DQN(BaseLearningAlgorithm):
 
             # check and update target network if needed
             if ep_num - self.last_target_update > self.target_update_rate:
-                self.save_model(ep_num, file_path)
                 self.last_target_update = ep_num
                 self.target_network.load_state_dict(self.q_network.state_dict())
 
-    def update_memory(self, action_operation, done, entities, reward, sensors, sim_time):
+        # check if model should be saved
+        if ep_num % self.save_rate == 0:
+            self.save_model(ep_num, file_path)
+
+    def update_memory(self, delta_t, action_operation, done, entities, reward, sensors, sim_time):
 
         # if is_new_action == True save data, else don't save the data
-        if sim_time - self.last_reset_time >= action_operation.frequency or done:
+        if np.abs(sim_time - self.last_reset_time)+delta_t/2.0 >= action_operation.frequency or done:
             self.state_info['norm_next_state'], self.state_info['next_state'] = self.normalize_state( entities, sensors)
 
             self.replay_buffer.add_experience(self.state_info['norm_state'], self.action_info['mutated_action'], reward, self.state_info['norm_next_state'], done)
 
             # save tuple to history
             self.add_sample_history(reward, done, sim_time)
+
+    def load_networks(self, model_path, model_num):
+        critic_file = os.path.join(model_path, self.name + '_epnum-' + str(model_num) + '.mdl')
+        self.q_network.load_state_dict(torch.load(critic_file))
+        self.q_network.eval()
 
     def forward(self,state):
         with torch.no_grad():
