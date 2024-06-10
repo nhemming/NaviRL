@@ -39,7 +39,7 @@ def main():
     # set experiments to evaluate
     base_folder = 'tune_boat_bspline_DQN'
     set_name = 'DQNBSpline'
-    trial_num = 0
+    trial_num = 1001
 
     abs_path = os.getcwd().replace('\\analysis', '\\experiments')
     base_dir = os.path.join(abs_path, base_folder)

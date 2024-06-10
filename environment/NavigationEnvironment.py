@@ -576,7 +576,10 @@ class NavigationEnvironment:
         max_num_episodes = self.h_params['MetaData']['num_episodes']
         for episode_num in range(max_num_episodes):
 
-            print("Episode Number={}".format(episode_num))
+            try:
+                print("Episode Number={}".format(episode_num))
+            except:
+                pass
 
             # run training simulation
             history_path = os.path.join(self.output_dir,'training')

@@ -54,6 +54,16 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
             path = os.path.join(path,str(fta))
         frames[name] = pd.read_csv(path)
 
+    # load aggregate data
+    aggregate = dict()
+    for name, value in sets_to_compare.items():
+        # open data file
+        path = '..\\'
+        folders_to_add = ['experiments',value['base_folder'],'output',value['set_name'],value['trial_num'],'evaluation',value['eval_trial_num'],'AggregateResults.csv']
+        for fta in folders_to_add:
+            path = os.path.join(path,str(fta))
+        aggregate[name] = pd.read_csv(path)
+
     # get the maximum amount episodes
     max_frame = 0
     for frame_name, frame in frames.items():
@@ -63,7 +73,7 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
 
     # graph the success rate
     sns.set_theme()
-    fig = plt.figure(0, figsize=(14, 8))
+    fig = plt.figure(0, figsize=(8, 6))
     ax = fig.add_subplot(111)
     k = 0
     x_col_name = 'ep_num'
@@ -77,7 +87,7 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
     plt.tight_layout()
 
     # graph crash rate
-    fig = plt.figure(1, figsize=(14, 8))
+    fig = plt.figure(1, figsize=(8, 6))
     ax = fig.add_subplot(111)
     k = 0
     x_col_name = 'ep_num'
@@ -91,7 +101,7 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
     plt.tight_layout()
 
     # plot distance to reach goal
-    fig = plt.figure(2, figsize=(14, 8))
+    fig = plt.figure(2, figsize=(8, 6))
     ax = fig.add_subplot(111)
     k = 0
     x_col_name = 'ep_num'
@@ -105,7 +115,7 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
     plt.tight_layout()
 
     # plot normalized distance to reach goal
-    fig = plt.figure(3, figsize=(14, 8))
+    fig = plt.figure(3, figsize=(8, 6))
     ax = fig.add_subplot(111)
     k = 0
     x_col_name = 'ep_num'
@@ -121,6 +131,190 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
     ax.legend()
     plt.tight_layout()
 
+    # plot bar chart of path length
+    #bar_df = pd.DataFrame(columns=['name','AOC','longest success rate','min average distance traveled [m]',''])
+    bar_dict_lst = []
+    for agg_name, agg in aggregate.items():
+        tmp_dict = {'name':agg_name,
+                    'AOC':agg.loc[agg['name'] == 'AOC'].iloc[0]['value'],
+                    'Minimum Average Distance Traveled':agg.loc[agg['name'] == 'min_dst_travel'].iloc[0]['value'],
+                    'Longest Success Rate':agg.loc[agg['name'] == 'longest_success_rate'].iloc[0]['value'],
+                    'Distance Traveled 5 Min':agg.loc[agg['name'] == 'distance_traveled[m]_5_min'].iloc[0]['value'],
+                    'Distance Traveled 5 Avg':agg.loc[agg['name'] == 'distance_traveled[m]_5_avg'].iloc[0]['value'],
+                    'Distance Traveled 5 Std':agg.loc[agg['name'] == 'distance_traveled[m]_5_std'].iloc[0]['value'],
+                    'Distance Traveled 10 Min': agg.loc[agg['name'] == 'distance_traveled[m]_10_min'].iloc[0]['value'],
+                    'Distance Traveled 10 Avg': agg.loc[agg['name'] == 'distance_traveled[m]_10_avg'].iloc[0]['value'],
+                    'Distance Traveled 10 Std': agg.loc[agg['name'] == 'distance_traveled[m]_10_std'].iloc[0]['value'],
+                    'Distance Traveled 20 Min': agg.loc[agg['name'] == 'distance_traveled[m]_20_min'].iloc[0]['value'],
+                    'Distance Traveled 20 Avg': agg.loc[agg['name'] == 'distance_traveled[m]_20_avg'].iloc[0]['value'],
+                    'Distance Traveled 20 Std': agg.loc[agg['name'] == 'distance_traveled[m]_20_std'].iloc[0]['value']
+                    }
+        bar_dict_lst.append(tmp_dict)
+
+    bar_df = pd.DataFrame(bar_dict_lst)
+
+    ind = np.arange(len(bar_df))  # the x locations for the groups
+    width = 0.5  # the width of the bars
+
+    fig = plt.figure(4, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    bars = ax.bar(ind,bar_df['Minimum Average Distance Traveled'], width)
+    ax.bar_label(bars, fmt='%.2f')
+    ax.set_ylabel('Minimum Average Distance Traveled in Evaluation Set [m]')
+    ax.set_xticks(ind)
+    ax.set_xticklabels(bar_df['name'].values)
+    plt.tight_layout()
+
+    fig = plt.figure(5, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    bars = ax.bar(ind, bar_df['AOC'], width)
+    ax.bar_label(bars, fmt='%.2f')
+    ax.set_ylabel('Area Under The Curve For Success [AOC]')
+    ax.set_xticks(ind)
+    ax.set_xticklabels(bar_df['name'].values)
+    plt.tight_layout()
+
+    fig = plt.figure(6, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    bars = ax.bar(ind, bar_df['Longest Success Rate'], width)
+    ax.bar_label(bars, fmt='%.2f')
+    ax.set_ylabel('Longest Success Rate')
+    ax.set_xticks(ind)
+    ax.set_xticklabels(bar_df['name'].values)
+    plt.tight_layout()
+
+    width = 0.25
+    fig = plt.figure(8, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    rects1 = ax.bar(ind - width , bar_df['Distance Traveled 5 Avg'], width, yerr=bar_df['Distance Traveled 5 Std'],label='Distance Traveled 5')
+    rects2 = ax.bar(ind , bar_df['Distance Traveled 10 Avg'], width, yerr=bar_df['Distance Traveled 10 Std'],
+                    label='Distance Traveled 10')
+    rects3 = ax.bar(ind + width , bar_df['Distance Traveled 20 Avg'], width, yerr=bar_df['Distance Traveled 20 Std'],
+                    label='Distance Traveled 20')
+    ax.set_ylabel('Average Distance Traveled Over Best Window')
+    ax.set_xticks(ind)
+    ax.set_xticklabels(bar_df['name'].values)
+    ax.legend()
+    plt.tight_layout()
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # graph learning efficinces
+    # ------------------------------------------------------------------------------------------------------------------
+    frames_training = dict()
+    for name, value in sets_to_compare.items():
+        # open data file
+        path = '..\\'
+        folders_to_add = ['experiments', value['base_folder'], 'output', value['set_name'], value['trial_num'],
+                          'progress', 'Training_summary.csv']
+        for fta in folders_to_add:
+            path = os.path.join(path, str(fta))
+        frames_training[name] = pd.read_csv(path)
+
+    # drop data from training frames not needed in evaluation set
+    for tmp_name, tmp_frame in frames.items():
+        eval_nums = list(tmp_frame['ep_num'])
+        tmp_training_frame = frames_training[tmp_name]
+        #frames_training[tmp_name] = tmp_training_frame.drop(tmp_training_frame[tmp_training_frame['ep_num'] in eval_nums].index)
+        frames_training[tmp_name] = tmp_training_frame[tmp_training_frame['ep_num'].isin(eval_nums)]
+
+    max_data_gen = 0
+    for frame_name, frame in frames_training.items():
+        tmp_max = frame['data_generated'].max()
+        if tmp_max > max_data_gen:
+            max_data_gen = tmp_max
+
+    # graph training efficiencies for success rate and distance to reach the goal.
+    fig = plt.figure(9, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0,max_data_gen], [tmp_frame['success'],tmp_frame['success']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['data_generated'],tmp_frame['success'],label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Amount of Data Generated in Training[-]')
+    ax.set_ylabel('Average Success Rate [-]')
+    plt.tight_layout()
+
+    fig = plt.figure(10, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0,max_data_gen], [tmp_frame['success'],tmp_frame['distance_traveled[m]']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['data_generated'],tmp_frame['distance_traveled[m]'],label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Amount of Data Generated in Training[-]')
+    ax.set_ylabel('Average Distance Travelled [m]')
+    plt.tight_layout()
+
+    max_data_train = 0
+    for frame_name, frame in frames_training.items():
+        tmp_max = frame['data_trained_on'].max()
+        if tmp_max > max_data_train:
+            max_data_train = tmp_max
+
+    fig = plt.figure(11, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0,max_data_train], [tmp_frame['success'],tmp_frame['success']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['data_trained_on'],tmp_frame['success'],label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Amount of Data Seen by Network [-]')
+    ax.set_ylabel('Average Success Rate [-]')
+    plt.tight_layout()
+
+    fig = plt.figure(12, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0,max_data_train], [tmp_frame['success'],tmp_frame['distance_traveled[m]']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['data_trained_on'],tmp_frame['distance_traveled[m]'],label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Amount of Data Seen by Network [-]')
+    ax.set_ylabel('Average Distance Travelled [m]')
+    plt.tight_layout()
+
+    max_data_grad = 0
+    for frame_name, frame in frames_training.items():
+        tmp_max = frame['n_grad_steps'].max()
+        if tmp_max > max_data_grad:
+            max_data_grad = tmp_max
+
+    fig = plt.figure(13, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0, max_data_grad], [tmp_frame['success'], tmp_frame['success']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['n_grad_steps'], tmp_frame['success'], label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Number of Gradient Steps [-]')
+    ax.set_ylabel('Average Success Rate [-]')
+    plt.tight_layout()
+
+    fig = plt.figure(14, figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for tmp_name, tmp_frame in frames.items():
+        if len(tmp_frame) == 1:
+            ax.semilogx([0, max_data_grad], [tmp_frame['success'], tmp_frame['distance_traveled[m]']], label=tmp_name)
+        else:
+            ax.semilogx(frames_training[tmp_name]['n_grad_steps'], tmp_frame['distance_traveled[m]'], label=tmp_name)
+
+    ax.legend()
+    ax.set_xlabel('Number of Gradient Steps [-]')
+    ax.set_ylabel('Average Distance Travelled [m]')
+    plt.tight_layout()
+
+    '''
     if include_training_data:
         # ------------------------------------------------------------------------------------------------------------------
         # graph training progress of training episodes
@@ -329,7 +523,7 @@ def create_graphs(sets_to_compare, graph_std, include_training_data):
             plt.tight_layout()
 
             fig_num += 1
-
+    '''
 
 
     plt.show()
@@ -341,38 +535,220 @@ if __name__ == '__main__':
     sets_to_compare = dict()
     include_training_data = False
 
-    set_0 = {
-        'base_folder': 'tune_boat_bspline_DQN',
-        'set_name': 'DQNBSpline',
-        'trial_num': 0,
+    # ------------------------------------------------------------------------------------------------------------------
+    # method comparison vvv
+    # ------------------------------------------------------------------------------------------------------------------
+
+    '''
+    # DDPG b spline
+    set_5 = {
+        'base_folder': 'tune_boat_bspline_DDPG',
+        'set_name': 'DDPGBSpline',
+        'trial_num': 5,
         'eval_trial_num': 0}
-    sets_to_compare['DQN_Bspline0'] = set_0
+    sets_to_compare['DDPG_BSpline'] = set_5
+
+    # DDPG dubins selected solution
+    set_2 = {
+        'base_folder': 'tune_boat_dubins_DDPG',
+        'set_name': 'DDPGDubins',
+        'trial_num': 2,
+        'eval_trial_num': 0}
+    sets_to_compare['DDPG_Dubins'] = set_2
 
     # DDPG vector control
+    set_1008 = {
+        'base_folder': 'tune_boat_vector_control_DDPG',
+        'set_name': 'DDPGVector',
+        'trial_num': 1008,
+        'eval_trial_num': 0}
+    sets_to_compare['DDPG_Vanilla'] = set_1008
+
+    # DQN bspline
+    set_100 = {
+        'base_folder': 'tune_boat_bspline_DQN',
+        'set_name': 'DQNBSpline',
+        'trial_num': 100,
+        'eval_trial_num': 0}
+    sets_to_compare['DQN_Bspline'] = set_100
+
+    # DQN dubins
+    set_100a = {
+        'base_folder': 'tune_boat_dubins_DQN',
+        'set_name': 'DQNDubins',
+        'trial_num': 100,
+        'eval_trial_num': 0}
+    sets_to_compare['DQN_Dubins'] = set_100a
+
+    # DQN vector control
+    set_1002 = {
+        'base_folder': 'tune_boat_vector_control_DQN',
+        'set_name': 'DQNVector',
+        'trial_num': 1002,
+        'eval_trial_num': 0}
+    sets_to_compare['DQN_Vanilla'] = set_1002
+
+    # RRTStar
+
+    set_0 = {
+        'base_folder': 'tune_boat_RRTstar',
+        'set_name': 'RRTstar',
+        'trial_num': 34,
+        'eval_trial_num': 0}
+    sets_to_compare['RRT'] = set_0
+
+    # PRM
+    set_49 = {
+        'base_folder': 'tune_boat_PRM',
+        'set_name': 'TunePRM',
+        'trial_num': 49,
+        'eval_trial_num': 0}
+    sets_to_compare['PRM'] = set_49
+    '''
+
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # method comparison ^^^
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # DRP compare spare reward vvv
+    # ------------------------------------------------------------------------------------------------------------------
+
+
+    set_100 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 100,
+        'eval_trial_num': 0}
+    sets_to_compare['0.6'] = set_100
+
+    set_101 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 101,
+        'eval_trial_num': 0}
+    sets_to_compare['0.7'] = set_101
+
+    set_102 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 102,
+        'eval_trial_num': 0}
+    sets_to_compare['0.8'] = set_102
+
+    set_103 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 103,
+        'eval_trial_num': 0}
+    sets_to_compare['0.9'] = set_103
+
+    set_104 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 104,
+        'eval_trial_num': 0}
+    sets_to_compare['0.95'] = set_104
+
+    set_105 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 105,
+        'eval_trial_num': 0}
+    sets_to_compare['0.99'] = set_105
+
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # DRP compare spare reward ^^^
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Vanilla RL compare spare reward vvv
+    # ------------------------------------------------------------------------------------------------------------------
+
+    '''
+    set_0 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 0,
+        'eval_trial_num': 0}
+    sets_to_compare['0.6'] = set_0
+
+    set_1 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 1,
+        'eval_trial_num': 0}
+    sets_to_compare['0.7'] = set_1
+
+    set_2 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 2,
+        'eval_trial_num': 0}
+    sets_to_compare['0.8'] = set_2
+
+    set_3 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 3,
+        'eval_trial_num': 0}
+    sets_to_compare['0.9'] = set_3
+
+    set_4 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 4,
+        'eval_trial_num': 0}
+    sets_to_compare['0.95'] = set_4
+
+    set_5 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 5,
+        'eval_trial_num': 0}
+    sets_to_compare['0.999735'] = set_5
+    '''
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Vanilla RL compare spare reward ^^^
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Vanilla RL and DRP compare spare reward vvv
+    # ------------------------------------------------------------------------------------------------------------------
+
+    '''
+    set_102 = {
+        'base_folder': 'tune_boat_bspline_DDPG_Sparse',
+        'set_name': 'DDPGBSplineSparse',
+        'trial_num': 102,
+        'eval_trial_num': 0}
+    sets_to_compare['DRP Sparse'] = set_102
+
+    set_5a = {
+        'base_folder': 'tune_boat_bspline_DDPG',
+        'set_name': 'DDPGBSpline',
+        'trial_num': 5,
+        'eval_trial_num': 0}
+    sets_to_compare['DRP Dense'] = set_5a
+
+    set_5 = {
+        'base_folder': 'tune_boat_vector_control_DDPG_Sparse',
+        'set_name': 'DDPGVectorSparse',
+        'trial_num': 5,
+        'eval_trial_num': 0}
+    sets_to_compare['Vanilla Sparse'] = set_5
 
     set_1008 = {
         'base_folder': 'tune_boat_vector_control_DDPG',
         'set_name': 'DDPGVector',
         'trial_num': 1008,
         'eval_trial_num': 0}
-    sets_to_compare['DDPG_Vector1008'] = set_1008
+    sets_to_compare['Vanilla Dense'] = set_1008
+    '''
 
-    # dubins selected solution
-    set_2 = {
-        'base_folder': 'tune_boat_dubins_DDPG',
-        'set_name': 'DDPGDubins',
-        'trial_num': 2,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_Dubins2'] = set_2
-
-    # bspline
-    set_1011 = {
-        'base_folder': 'demo_to_test_boat_DDPG',
-        'set_name': 'DebugDDPGBSpline',
-        'trial_num': 1011,
-        'eval_trial_num': 0}
-    sets_to_compare['DDPG_BSpline1011'] = set_1011
-    
     """
     Edit above ^^
     """

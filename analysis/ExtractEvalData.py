@@ -31,6 +31,44 @@ def load_environment(base_folder, set_name, trial_num):
     env.build_eval_env_from_yaml(file_name,os.getcwd(), create=False) # TODO investigate correct input dir
     return env
 
+def add_window_distributions(df_avg, agg_lst, field):
+    windows = [5, 10, 20]
+    for win in windows:
+        avg = uniform_filter1d(df_avg[field], win)
+
+        # TODO remove after testing
+        '''
+        sns.set_theme()
+        fig = plt.figure(0)
+        plt.plot(df_avg['ep_num'],df_avg[field])
+        plt.plot(df_avg['ep_num'],avg)
+        '''
+
+        min_idx = np.argmin(avg)
+
+        half = int(win / 2.0)
+        if len(avg) - half < min_idx:
+            # close to the end of the sequence
+            stop = len(avg)
+            start = len(avg) - win
+        elif min_idx < win:
+            # too close to teh start
+            start = 0
+            stop = win - 1
+        else:
+            start = win - half + min_idx
+            stop = win + half+1 + min_idx
+        win_data = df_avg[field][start:stop]
+        avg_dst = np.mean(win_data)
+        std_dst = np.std(win_data)
+
+        tmp_dict = {'name': field+'_' + str(win) + '_min', 'value': np.min(avg)}
+        agg_lst.append(tmp_dict)
+        tmp_dict = {'name':field+'_' + str(win) + '_avg', 'value':  avg_dst}
+        agg_lst.append(tmp_dict)
+        tmp_dict = {'name':field+'_' + str(win) + '_std', 'value':  std_dst}
+        agg_lst.append(tmp_dict)
+
 
 def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
@@ -73,7 +111,7 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
     # Loop over each initial contidion
     ic_dict = dict()
     for ic_num in range(env.eval_set_size):
-    #for ic_num in range(16,20):
+    #for ic_num in range(0,3):
 
         print("Extracting IC : {:d}".format(ic_num))
 
@@ -173,6 +211,7 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
     else:
         aoc = trapezoid(y=df_avg['success'], x=df_avg['ep_num'])
     min_norm_dst_travel = df_avg['normalized_distance_traveled'].min()
+    min_dst_travel = df_avg['distance_traveled[m]'].min()
     success = list(df_avg['success'])
 
     window = 0
@@ -189,10 +228,16 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
             max_window = window
     longest_success_rate = max_window
 
-    aggregate_dict_0 = {'name': 'AOC', 'value':aoc }
+    aggregate_dict_0 = {'name': 'AOC', 'value': aoc}
     aggregate_dict_1 = {'name': 'min_norm_dst_travel', 'value': min_norm_dst_travel}
-    aggregate_dict_2 = {'name': 'longest_success_rate', 'value': longest_success_rate}
-    agg_lst = [aggregate_dict_0, aggregate_dict_1, aggregate_dict_2]
+    aggregate_dict_2 = {'name': 'min_dst_travel', 'value': min_dst_travel}
+    aggregate_dict_3 = {'name': 'longest_success_rate', 'value': longest_success_rate}
+    agg_lst = [aggregate_dict_0, aggregate_dict_1, aggregate_dict_2, aggregate_dict_3]
+
+    # get average over sliding window with std.
+    add_window_distributions(df_avg, agg_lst, 'distance_traveled[m]')
+    add_window_distributions(df_avg, agg_lst, 'normalized_distance_traveled')
+
 
     df_agg = pd.DataFrame(agg_lst)
     df_agg.to_csv(os.path.join(base_dir,'AggregateResults.csv'),index=False)
@@ -200,9 +245,9 @@ def extract_data(base_folder, set_name, trial_num, eval_trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'tune_boat_bspline_DQN'
-    set_name = 'DQNBSpline'
-    trial_num = 0
+    base_folder = 'tune_boat_bspline_DDPG_Sparse'
+    set_name = 'DDPGBSplineSparse'
+    trial_num = 107
     eval_trial_num = 0
 
     """

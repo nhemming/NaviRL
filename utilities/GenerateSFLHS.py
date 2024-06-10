@@ -289,7 +289,7 @@ def space_filling_latin_hyper_cube(n_points,n_vars, pop_size, max_iter):
 
 if __name__ == '__main__':
 
-    n_points = 20
+    n_points = 40
     n_vars = 3
     pop = 100
     max_iter = 500

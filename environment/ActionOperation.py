@@ -272,14 +272,16 @@ class BSplineControl(ActionOperation):
             col_names = list(path_cols.columns)
             path_dict = dict()
             for col in col_names:
-                part_col = col.split('_')
-                point_num = int(part_col[len(part_col) - 1])
+                if self.is_continuous:
+                    part_col = col.split('_')
+                    point_num = int(part_col[len(part_col) - 1])
 
-                path_dict[point_num] = path_cols[col].iloc[slice_len]
-
-            angle_df = pd.DataFrame(path_dict.items(), columns=['angle', 'val'])
-            angle_df.sort_values(by=['angle'], inplace=True)
-            path_angles = angle_df['val'].to_numpy()
+                    path_dict[point_num] = path_cols[col].iloc[slice_len]
+                    angle_df = pd.DataFrame(path_dict.items(), columns=['angle', 'val'])
+                    angle_df.sort_values(by=['angle'], inplace=True)
+                    path_angles = angle_df['val'].to_numpy()
+                else:
+                    path_angles = path_cols[col].iloc[0]
 
             # un-normalize angles
             if self.is_continuous:

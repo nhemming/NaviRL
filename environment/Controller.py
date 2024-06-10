@@ -40,6 +40,9 @@ class PDController(Controller):
 
         y_dot = (error[1] - self.old_error[1]) / dt
 
+        if np.abs(v_mag)< 1e-10:
+            # correct for 0 velocity
+            v_mag = 1e-6
         prop = self.coeffs.p * error[1] / v_mag
         deriv = self.coeffs.d * y_dot
 

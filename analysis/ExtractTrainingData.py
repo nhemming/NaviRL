@@ -97,7 +97,7 @@ def extract_train_data(base_folder, set_name, trial_num):
             if isinstance(term_func, ReachDestinationTermination):
                 goal_dst = term_func.goal_dst
 
-    cols = ['ep_num', 'data_generated', 'data_trained_on','success','crash','reward','dst_traveled[m]']
+    cols = ['ep_num', 'data_generated', 'data_trained_on','n_grad_steps','success','crash','reward','dst_traveled[m]']
     df_eff = pd.DataFrame(data=np.zeros((env.h_params['MetaData']['num_episodes'], len(cols))), columns=cols)
     n_data_generated = 0
     # loop over episode number
@@ -118,11 +118,16 @@ def extract_train_data(base_folder, set_name, trial_num):
             # get the amount of data trained on. Need to respect if the agent has learned enough data to start training
             if n_data_generated < batch_size:
                 df_eff['data_trained_on'].iloc[ep_num] = 0.0
+                df_eff['n_grad_steps'].iloc[ep_num] = 0.0
             else:
                 if ep_num == 0:
                     df_eff['data_trained_on'].iloc[ep_num] = n_batches*batch_size
+                    df_eff['n_grad_steps'].iloc[ep_num] = batch_size
                 else:
                     df_eff['data_trained_on'].iloc[ep_num] = df_eff['data_trained_on'].iloc[ep_num-1] + n_batches*batch_size
+                    df_eff['n_grad_steps'].iloc[ep_num] = df_eff['n_grad_steps'].iloc[
+                                                                 ep_num - 1] + batch_size
+
 
             # get reward accumulation
             df_eff['reward'].iloc[ep_num] = tmp_df['reward'].sum()
@@ -182,9 +187,9 @@ def extract_train_data(base_folder, set_name, trial_num):
 
 if __name__ == '__main__':
 
-    base_folder = 'demo_to_test_boat_DDPG'
-    set_name = 'DebugDDPGBSpline'
-    trial_num = 9
+    base_folder = 'tune_boat_bspline_DDPG_Sparse'
+    set_name = 'DDPGBSplineSparse'
+    trial_num = 107
 
     """
     Edit above ^^

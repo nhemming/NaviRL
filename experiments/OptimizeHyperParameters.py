@@ -590,26 +590,35 @@ def optimize_h_params(set_name, sim_def_file_name, eval_sim_def_file_name, hp_va
 if __name__ == '__main__':
 
     # definition of the hyper parameters
-    set_name = 'demo_to_test_3dhparam_opt'
-    sim_def_file_name = 'experiment_setup_DDPG_bspline_control.yaml'
+    set_name = 'tune_boat_PRM'
+    sim_def_file_name = 'experiment_setup_PRM.yaml'
     eval_sim_def_file_name = 'no_obstacle_mass_free_evaluation_set.yaml'
     hp_vars_dict = OrderedDict()
 
-    hp_0 = {'name': 'LearningAgent;LearningAlgorithm;alg0;batch_size','min':32,'max':1024,'type':'int'}
+    hp_0 = {'name': 'Sensors;sensor1;n_samples','min':500,'max':1000,'type':'int'}
     hp_vars_dict[hp_0['name']] = hp_0
 
+    hp_1 = {'name': 'Sensors;sensor1;trans_dst', 'min': 1.0, 'max': 5.0, 'type': 'float'}
+    hp_vars_dict[hp_1['name']] = hp_1
+
+    hp_2 = {'name': 'Sensors;sensor1;max_connect_dst', 'min': 30.0, 'max': 80.0, 'type': 'float'}
+    hp_vars_dict[hp_2['name']] = hp_2
+
+    '''
     hp_1 = {'name': 'LearningAgent;LearningAlgorithm;alg0;num_batches', 'min': 8, 'max': 128,'type':'int'} # 0.5 default
     hp_vars_dict[hp_1['name']] = hp_1
 
+    
     hp_2 = {'name': 'coincident0', 'name_lst': ['LearningAgent;LearningAlgorithm;alg0;NetworkActor;head0;hidden_layers',
                                                'LearningAgent;LearningAlgorithm;alg0;NetworkActor;tail;hidden_layers',
                                                'LearningAgent;LearningAlgorithm;alg0;NetworkCritic;head0;hidden_layers',
                                                'LearningAgent;LearningAlgorithm;alg0;NetworkCritic;tail;hidden_layers']
         , 'min': 8, 'max': 128, 'type': 'int'}
     hp_vars_dict[hp_2['name']] = hp_2
+    '''
 
     # number of initial doe samples
-    doe_hp = {'n_points' : 20}
+    doe_hp = {'n_points' : 40}
 
 
     # number of infill searches. Note the number of infill points will be double this value

@@ -16,7 +16,7 @@ class NoLearning(BaseLearningAlgorithm):
 
         self.action_info = OrderedDict()
 
-    def create_state_action(self, action_operation, entities, ep_num, sensors, sim_time, use_exploration):
+    def create_state_action(self, delta_t,action_operation, entities, ep_num, sensors, sim_time, use_exploration):
         self.action_info['mutated_action'] = None
 
     def load_networks(self, model_path, model_num):

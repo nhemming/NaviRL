@@ -548,6 +548,7 @@ class DestinationRRTStarSensor(Sensor):
 
             # draw random point
             location = np.zeros((2,))
+            #print(self.sample_domain[0,0]+start_loc[0],self.sample_domain[1,0]+start_loc[0])
             location[0] = np.random.uniform(low=self.sample_domain[0,0]+start_loc[0], high=self.sample_domain[1,0]+start_loc[0])
             location[1] = np.random.uniform(low=self.sample_domain[0,1]+start_loc[1], high=self.sample_domain[1,1]+start_loc[1])
 
